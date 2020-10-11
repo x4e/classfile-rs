@@ -5,6 +5,7 @@ use std::io::{Seek, Read, Write};
 mod version;
 mod classfile;
 mod access;
+mod field;
 
 
 trait Serializable {

@@ -2,13 +2,32 @@ use crate::Serializable;
 use std::io::{Read, Write, Seek};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::Borrow;
-use crate::constantpool::ConstantType::{MethodHandle, MethodType, Dynamic, InvokeDynamic, Package, Module};
 
-type CPIndex = u16;
+pub type CPIndex = u16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstantPool {
 	inner: Vec<Option<ConstantType>>
+}
+
+impl ConstantPool {
+	pub fn get(&self, index: CPIndex) -> ConstantType {
+		self.inner.get(index as usize).unwrap().unwrap()
+	}
+	
+	pub fn class(&self, index: CPIndex) -> Option<ClassInfo> {
+		match self.get(index) {
+			ConstantType::Class(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn fieldref(&self, index: CPIndex) -> Option<FieldInfo> {
+		match self.get(index) {
+			ConstantType::Fieldref(t) => Some(t),
+			_ => None,
+		}
+	}
 }
 
 impl Serializable for ConstantPool {
@@ -32,65 +51,100 @@ impl Serializable for ConstantPool {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ClassInfo {
+	name_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct FieldInfo {
+	class_index: CPIndex,
+	name_and_type_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct MethodRefInfo {
+	class_index: CPIndex,
+	name_and_type_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct InterfaceMethodRefInfo {
+	class_index: CPIndex,
+	name_and_type_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringInfo {
+	string_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct IntegerInfo {
+	bytes: i32
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct FloatInfo {
+	bytes: f32
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct LongInfo {
+	bytes: i64
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct DoubleInfo {
+	bytes: f64
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct NameAndTypeInfo {
+	name_index: CPIndex,
+	descriptor_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Utf8Info {
+	str: String
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct MethodHandleInfo {
+	reference_kind: u8,
+	reference_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct MethodTypeInfo {
+	descriptor_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct DynamicInfo {
+	bootstrap_method_attr_index: CPIndex,
+	name_and_type_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct InvokeDynamicInfo {
+	bootstrap_method_attr_index: CPIndex,
+	name_and_type_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModuleInfo {
+	name_index: CPIndex
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct PackageInfo {
+	name_index: CPIndex
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConstantType {
-	Class {
-		name_index: CPIndex
-	},
-	Fieldref {
-		class_index: CPIndex,
-		name_and_type_index: CPIndex
-	},
-	Methodref {
-		class_index: CPIndex,
-		name_and_type_index: CPIndex
-	},
-	InterfaceMethodref {
-		class_index: CPIndex,
-		name_and_type_index: CPIndex
-	},
-	String {
-		string_index: CPIndex
-	},
-	Integer {
-		bytes: i32
-	},
-	Float {
-		bytes: f32
-	},
-	Long {
-		bytes: i64
-	},
-	Double {
-		bytes: f64
-	},
-	NameAndType {
-		name_index: CPIndex,
-		descriptor_index: CPIndex
-	},
-	Utf8 {
-		str: String
-	},
-	MethodHandle {
-		reference_kind: u8,
-		reference_index: CPIndex
-	},
-	MethodType {
-		descriptor_index: CPIndex
-	},
-	Dynamic {
-		bootstrap_method_attr_index: CPIndex,
-		name_and_type_index: CPIndex
-	},
-	InvokeDynamic {
-		bootstrap_method_attr_index: CPIndex,
-		name_and_type_index: CPIndex
-	},
-	Module {
-		name_index: CPIndex
-	},
-	Package {
-		name_index: CPIndex
-	}
+	Class (ClassInfo),
+	Fieldref (FieldInfo),
+	Methodref (MethodRefInfo),
+	InterfaceMethodref (InterfaceMethodRefInfo),
+	String (StringInfo),
+	Integer (IntegerInfo),
+	Float (FloatInfo),
+	Long (LongInfo),
+	Double (DoubleInfo),
+	NameAndType (NameAndTypeInfo),
+	Utf8 (Utf8Info),
+	MethodHandle (MethodHandleInfo),
+	MethodType (MethodTypeInfo),
+	Dynamic (DynamicInfo),
+	InvokeDynamic (InvokeDynamicInfo),
+	Module (ModuleInfo),
+	Package (PackageInfo)
 }
 
 impl Serializable for ConstantType {
@@ -98,38 +152,58 @@ impl Serializable for ConstantType {
 		let tag = rdr.read_u8().unwrap();
 		match tag {
 			7 => ConstantType::Class {
-				name_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: ClassInfo {
+					name_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			9 => ConstantType::Fieldref {
-				class_index: rdr.read_u16::<BigEndian>().unwrap(),
-				name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: FieldInfo {
+					class_index: rdr.read_u16::<BigEndian>().unwrap(),
+					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			10 => ConstantType::Methodref {
-				class_index: rdr.read_u16::<BigEndian>().unwrap(),
-				name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: MethodRefInfo {
+					class_index: rdr.read_u16::<BigEndian>().unwrap(),
+					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			11 => ConstantType::InterfaceMethodref {
-				class_index: rdr.read_u16::<BigEndian>().unwrap(),
-				name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: InterfaceMethodRefInfo {
+					class_index: rdr.read_u16::<BigEndian>().unwrap(),
+					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			8 => ConstantType::String {
-				string_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: StringInfo {
+					string_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			3 => ConstantType::Integer {
-				bytes: rdr.read_i32::<BigEndian>().unwrap()
+				0: IntegerInfo {
+					bytes: rdr.read_i32::<BigEndian>().unwrap()
+				},
 			},
 			4 => ConstantType::Float {
-				bytes: rdr.read_f32::<BigEndian>().unwrap()
+				0: FloatInfo {
+					bytes: rdr.read_f32::<BigEndian>().unwrap()
+				},
 			},
 			5 => ConstantType::Long {
-				bytes: rdr.read_i64::<BigEndian>().unwrap()
+				0: LongInfo {
+					bytes: rdr.read_i64::<BigEndian>().unwrap()
+				},
 			},
 			6 => ConstantType::Double {
-				bytes: rdr.read_f64::<BigEndian>().unwrap()
+				0: DoubleInfo {
+					bytes: rdr.read_f64::<BigEndian>().unwrap()
+				},
 			},
 			12 => ConstantType::NameAndType {
-				name_index: rdr.read_u16::<BigEndian>().unwrap(),
-				descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+				0: NameAndTypeInfo {
+					name_index: rdr.read_u16::<BigEndian>().unwrap(),
+					descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			1 => {
 				let length = rdr.read_u16::<BigEndian>().unwrap() as usize;
@@ -174,29 +248,43 @@ impl Serializable for ConstantType {
 				}
 				
 				ConstantType::Utf8 {
-					str
+					0: Utf8Info {
+						str
+					},
 				}
 			},
-			15 => MethodHandle {
-				reference_kind: rdr.read_u8().unwrap(),
-				reference_index: rdr.read_u16::<BigEndian>().unwrap()
+			15 => ConstantType::MethodHandle {
+				0: MethodHandleInfo {
+					reference_kind: rdr.read_u8().unwrap(),
+					reference_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
-			16 => MethodType {
-				descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+			16 => ConstantType::MethodType {
+				0: MethodTypeInfo {
+					descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
-			17 => Dynamic {
-				bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
-				name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+			17 => ConstantType::Dynamic {
+				0: DynamicInfo {
+					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
+					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
-			18 => InvokeDynamic {
-				bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
-				name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+			18 => ConstantType::InvokeDynamic {
+				0: InvokeDynamicInfo {
+					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
+					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
-			19 => Module {
-				name_index: rdr.read_u16::<BigEndian>().unwrap()
+			19 => ConstantType::Module {
+				0: ModuleInfo {
+					name_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
-			20 => Package {
-				name_index: rdr.read_u16::<BigEndian>().unwrap()
+			20 => ConstantType::Package {
+				0: PackageInfo {
+					name_index: rdr.read_u16::<BigEndian>().unwrap()
+				},
 			},
 			_ => panic!("Unknown Constant tag {}", tag)
 		}

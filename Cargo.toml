@@ -1,0 +1,10 @@
+[package]
+name = "classfile-rs"
+version = "0.1.0"
+authors = ["mastercooker <c.o.okiedragon234@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.3.4"

@@ -1,27 +1,45 @@
 use crate::Serializable;
 use std::io::{Read, Seek, Write};
-use std::cmp::{PartialOrd};
+use std::cmp::{PartialOrd, Ordering};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
 pub struct ClassVersion {
-	major: MajorVersion,
-	minor: u16
+	pub major: MajorVersion,
+	pub minor: u16
+}
+
+impl PartialOrd for ClassVersion {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		let major = self.major.cmp(&other.major);
+		if major == Ordering::Equal {
+			return Some(self.minor.cmp(&other.minor));
+		}
+		Some(major)
+	}
 }
 
 impl Serializable for ClassVersion {
 	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
 		let minor = rdr.read_u16::<BigEndian>().unwrap();
 		let major = rdr.read_u16::<BigEndian>().unwrap();
-		ClassVersion {
-			major: major.into(),
-			minor
-		}
+		ClassVersion::new(major.into(), minor)
 	}
 	
 	fn write<W: Seek + Write>(&self, wtr: &mut W) {
 		wtr.write_u16::<BigEndian>(self.minor).unwrap();
 		wtr.write_u16::<BigEndian>(self.major.into()).unwrap();
+	}
+}
+
+impl ClassVersion {
+	fn new_major(major: MajorVersion) -> Self {
+		ClassVersion::new(major, 0)
+	}
+	fn new(major: MajorVersion, minor: u16) -> Self {
+		ClassVersion {
+			major, minor
+		}
 	}
 }
 

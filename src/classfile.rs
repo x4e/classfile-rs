@@ -13,7 +13,7 @@ pub struct ClassFile {
 	access_flags: ClassAccessFlags,
 	this_class: String,
 	super_class: String,
-	interfaces: Vec<CPIndex>,
+	interfaces: Vec<String>,
 	fields: Vec<Field>
 }
 
@@ -30,9 +30,9 @@ impl Serializable for ClassFile {
 		let super_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
 		
 		let num_interfaces = rdr.read_u16::<BigEndian>().unwrap() as usize;
-		let mut interfaces: Vec<CPIndex> = Vec::with_capacity(num_interfaces);
+		let mut interfaces: Vec<String> = Vec::with_capacity(num_interfaces);
 		for _ in 0..num_interfaces {
-			interfaces.push(rdr.read_u16::<BigEndian>().unwrap());
+			interfaces.push(constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone());
 		}
 		
 		let num_fields = rdr.read_u16::<BigEndian>().unwrap() as usize;

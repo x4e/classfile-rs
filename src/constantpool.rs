@@ -10,22 +10,28 @@ pub struct ConstantPool {
 	inner: Vec<Option<ConstantType>>
 }
 
+#[allow(dead_code)]
 impl ConstantPool {
 	pub fn get(&self, index: CPIndex) -> &ConstantType {
-		self.inner.get(index as usize).unwrap().as_ref().unwrap()
-	}
-	
-	pub fn class(&self, index: CPIndex) -> Option<&ClassInfo> {
-		match self.get(index) {
-			ConstantType::Class(t) => Some(t),
-			_ => None,
+		match self.inner.get(index as usize) {
+			Some(Some(x)) => {
+				x
+			}
+			_ => panic!("Constant pool does not have index {}", index)
 		}
 	}
 	
-	pub fn fieldref(&self, index: CPIndex) -> Option<&FieldRefInfo> {
+	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo, String> {
 		match self.get(index) {
-			ConstantType::Fieldref(t) => Some(t),
-			_ => None,
+			ConstantType::Class(t) => Ok(t),
+			_ => Err(format!("Index {} is not a Class", index)),
+		}
+	}
+	
+	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo, String> {
+		match self.get(index) {
+			ConstantType::Fieldref(t) => Ok(t),
+			_ => Err(format!("Index {} is not a Fieldref", index)),
 		}
 	}
 	
@@ -85,10 +91,10 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn utf8(&self, index: CPIndex) -> Option<&Utf8Info> {
+	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info, String> {
 		match self.get(index) {
-			ConstantType::Utf8(t) => Some(t),
-			_ => None,
+			ConstantType::Utf8(t) => Ok(t),
+			_ => Err(format!("Index {} is not a Utf8", index)),
 		}
 	}
 	
@@ -139,9 +145,19 @@ impl Serializable for ConstantPool {
 	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
 		let size = rdr.read_u16::<BigEndian>().unwrap() as usize;
 		let mut inner: Vec<Option<ConstantType>> = vec![None; size];
-		println!("CP: {}", size);
+		let mut skip = false;
 		for i in 1..size {
+			if skip {
+				skip = false;
+				continue
+			}
 			let constant = ConstantType::parse(rdr);
+			match constant {
+				ConstantType::Double(..) | ConstantType::Long(..) => {
+					skip = true;
+				}
+				_ => {}
+			}
 			inner[i] = Some(constant);
 		}
 		

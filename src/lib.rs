@@ -6,6 +6,7 @@ mod version;
 mod classfile;
 mod access;
 mod field;
+mod attributes;
 
 
 trait Serializable {
@@ -25,23 +26,22 @@ mod tests {
     fn it_works() {
 		// Read
 		let start = Instant::now();
+		let dir = "Class.class";
 		let class = {
-			let dir = "Test.class";
 			let f = File::open(dir).unwrap();
 			let mut reader = BufReader::new(f);
-			//let mut cursor = Cursor::new(f);
 			ClassFile::parse(&mut reader)
 		};
 		
+		let elapsed = start.elapsed();
 		println!("{:#?}", class);
-		println!("Finished parsing in {:#?}", start.elapsed());
+		println!("Finished parsing {} in {:#?}", dir, elapsed);
 		
 		// Write
 		{
 			let dir = "TestOut.class";
 			let f = File::create(dir).unwrap();
 			let mut writer = BufWriter::new(f);
-			//let mut cursor = Cursor::new(writer);
 			class.write(&mut writer);
 		}
     }

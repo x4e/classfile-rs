@@ -181,7 +181,7 @@ impl ToString for AccessFlag {
 
 impl Debug for AccessFlag {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-		f.write_str(self.to_string().borrow());
+		f.write_str(self.to_string().borrow()).unwrap();
 		Ok(())
 	}
 }

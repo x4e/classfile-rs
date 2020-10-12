@@ -11,20 +11,125 @@ pub struct ConstantPool {
 }
 
 impl ConstantPool {
-	pub fn get(&self, index: CPIndex) -> ConstantType {
-		self.inner.get(index as usize).unwrap().unwrap()
+	pub fn get(&self, index: CPIndex) -> &ConstantType {
+		self.inner.get(index as usize).unwrap().as_ref().unwrap()
 	}
 	
-	pub fn class(&self, index: CPIndex) -> Option<ClassInfo> {
+	pub fn class(&self, index: CPIndex) -> Option<&ClassInfo> {
 		match self.get(index) {
 			ConstantType::Class(t) => Some(t),
 			_ => None,
 		}
 	}
 	
-	pub fn fieldref(&self, index: CPIndex) -> Option<FieldInfo> {
+	pub fn fieldref(&self, index: CPIndex) -> Option<&FieldRefInfo> {
 		match self.get(index) {
 			ConstantType::Fieldref(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn methodref(&self, index: CPIndex) -> Option<&MethodRefInfo> {
+		match self.get(index) {
+			ConstantType::Methodref(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn interfacemethodref(&self, index: CPIndex) -> Option<&InterfaceMethodRefInfo> {
+		match self.get(index) {
+			ConstantType::InterfaceMethodref(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn string(&self, index: CPIndex) -> Option<&StringInfo> {
+		match self.get(index) {
+			ConstantType::String(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn integer(&self, index: CPIndex) -> Option<&IntegerInfo> {
+		match self.get(index) {
+			ConstantType::Integer(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn float(&self, index: CPIndex) -> Option<&FloatInfo> {
+		match self.get(index) {
+			ConstantType::Float(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn long(&self, index: CPIndex) -> Option<&LongInfo> {
+		match self.get(index) {
+			ConstantType::Long(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn double(&self, index: CPIndex) -> Option<&DoubleInfo> {
+		match self.get(index) {
+			ConstantType::Double(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn nameandtype(&self, index: CPIndex) -> Option<&NameAndTypeInfo> {
+		match self.get(index) {
+			ConstantType::NameAndType(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn utf8(&self, index: CPIndex) -> Option<&Utf8Info> {
+		match self.get(index) {
+			ConstantType::Utf8(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn methodhandle(&self, index: CPIndex) -> Option<&MethodHandleInfo> {
+		match self.get(index) {
+			ConstantType::MethodHandle(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn methodtype(&self, index: CPIndex) -> Option<&MethodTypeInfo> {
+		match self.get(index) {
+			ConstantType::MethodType(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn dynamicinfo(&self, index: CPIndex) -> Option<&DynamicInfo> {
+		match self.get(index) {
+			ConstantType::Dynamic(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn invokedynamicinfo(&self, index: CPIndex) -> Option<&InvokeDynamicInfo> {
+		match self.get(index) {
+			ConstantType::InvokeDynamic(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn module(&self, index: CPIndex) -> Option<&ModuleInfo> {
+		match self.get(index) {
+			ConstantType::Module(t) => Some(t),
+			_ => None,
+		}
+	}
+	
+	pub fn package(&self, index: CPIndex) -> Option<&PackageInfo> {
+		match self.get(index) {
+			ConstantType::Package(t) => Some(t),
 			_ => None,
 		}
 	}
@@ -50,86 +155,86 @@ impl Serializable for ConstantPool {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ClassInfo {
-	name_index: CPIndex
+	pub name_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
-pub struct FieldInfo {
-	class_index: CPIndex,
-	name_and_type_index: CPIndex
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct FieldRefInfo {
+	pub class_index: CPIndex,
+	pub name_and_type_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MethodRefInfo {
-	class_index: CPIndex,
-	name_and_type_index: CPIndex
+	pub class_index: CPIndex,
+	pub name_and_type_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct InterfaceMethodRefInfo {
-	class_index: CPIndex,
-	name_and_type_index: CPIndex
+	pub class_index: CPIndex,
+	pub name_and_type_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct StringInfo {
-	string_index: CPIndex
+	pub string_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct IntegerInfo {
-	bytes: i32
+	pub bytes: i32
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct FloatInfo {
-	bytes: f32
+	pub bytes: f32
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct LongInfo {
-	bytes: i64
+	pub bytes: i64
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct DoubleInfo {
-	bytes: f64
+	pub bytes: f64
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct NameAndTypeInfo {
-	name_index: CPIndex,
-	descriptor_index: CPIndex
+	pub name_index: CPIndex,
+	pub descriptor_index: CPIndex
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Utf8Info {
-	str: String
+	pub str: String
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MethodHandleInfo {
-	reference_kind: u8,
-	reference_index: CPIndex
+	pub reference_kind: u8,
+	pub reference_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct MethodTypeInfo {
-	descriptor_index: CPIndex
+	pub descriptor_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct DynamicInfo {
-	bootstrap_method_attr_index: CPIndex,
-	name_and_type_index: CPIndex
+	pub bootstrap_method_attr_index: CPIndex,
+	pub name_and_type_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct InvokeDynamicInfo {
-	bootstrap_method_attr_index: CPIndex,
-	name_and_type_index: CPIndex
+	pub bootstrap_method_attr_index: CPIndex,
+	pub name_and_type_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ModuleInfo {
-	name_index: CPIndex
+	pub name_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PackageInfo {
-	name_index: CPIndex
+	pub name_index: CPIndex
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConstantType {
 	Class (ClassInfo),
-	Fieldref (FieldInfo),
+	Fieldref (FieldRefInfo),
 	Methodref (MethodRefInfo),
 	InterfaceMethodref (InterfaceMethodRefInfo),
 	String (StringInfo),
@@ -157,7 +262,7 @@ impl Serializable for ConstantType {
 				},
 			},
 			9 => ConstantType::Fieldref {
-				0: FieldInfo {
+				0: FieldRefInfo {
 					class_index: rdr.read_u16::<BigEndian>().unwrap(),
 					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
 				},

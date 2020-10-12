@@ -17,12 +17,14 @@ trait Serializable {
 mod tests {
 	use std::fs::File;
 	use std::io::{BufReader, BufWriter};
+	use std::time::Instant;
 	use crate::classfile::ClassFile;
 	use crate::Serializable;
 	
 	#[test]
     fn it_works() {
 		// Read
+		let start = Instant::now();
 		let class = {
 			let dir = "Test.class";
 			let f = File::open(dir).unwrap();
@@ -32,6 +34,7 @@ mod tests {
 		};
 		
 		println!("{:#?}", class);
+		println!("Finished parsing in {:#?}", start.elapsed());
 		
 		// Write
 		{

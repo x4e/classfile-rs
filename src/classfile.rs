@@ -25,8 +25,8 @@ impl Serializable for ClassFile {
 		let version = ClassVersion::parse(rdr);
 		let constant_pool = ConstantPool::parse(rdr);
 		let access_flags = ClassAccessFlags::parse(rdr);
-		let this_class = constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap();
-		let super_class = constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap();
+		let this_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
+		let super_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
 		
 		let num_interfaces = rdr.read_u16::<BigEndian>().unwrap() as usize;
 		let mut interfaces: Vec<CPIndex> = Vec::with_capacity(num_interfaces);
@@ -37,7 +37,7 @@ impl Serializable for ClassFile {
 		let num_fields = rdr.read_u16::<BigEndian>().unwrap() as usize;
 		let mut fields: Vec<Field> = Vec::with_capacity(num_fields);
 		for _ in 0..num_fields {
-			fields.push(Field::parse(rdr));
+			fields.push(Field::parse(rdr, &constant_pool));
 		}
 		
 		ClassFile {

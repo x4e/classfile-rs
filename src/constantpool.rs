@@ -12,6 +12,12 @@ pub struct ConstantPool {
 
 #[allow(dead_code)]
 impl ConstantPool {
+	pub fn new() -> ConstantPool {
+		ConstantPool {
+			inner: Vec::with_capacity(12)
+		}
+	}
+	
 	pub fn get(&self, index: CPIndex) -> &ConstantType {
 		match self.inner.get(index as usize) {
 			Some(Some(x)) => {

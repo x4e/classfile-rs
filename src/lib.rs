@@ -2,11 +2,13 @@ mod constantpool;
 
 use std::io::{Seek, Read, Write};
 
-mod version;
 mod classfile;
+mod version;
 mod access;
-mod field;
 mod attributes;
+mod field;
+mod method;
+mod code;
 
 
 trait Serializable {

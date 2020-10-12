@@ -32,6 +32,7 @@ impl Serializable for ClassVersion {
 	}
 }
 
+#[allow(dead_code)]
 impl ClassVersion {
 	fn new_major(major: MajorVersion) -> Self {
 		ClassVersion::new(major, 0)

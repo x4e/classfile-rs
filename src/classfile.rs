@@ -2,9 +2,10 @@ use std::io::{Write, Seek, Read};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::Serializable;
 use crate::version::ClassVersion;
-use crate::constantpool::{ConstantPool, CPIndex};
+use crate::constantpool::{ConstantPool};
 use crate::access::ClassAccessFlags;
-use crate::field::Field;
+use crate::field::{Field, Fields};
+use crate::method::{Methods, Method};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassFile {
@@ -14,7 +15,8 @@ pub struct ClassFile {
 	this_class: String,
 	super_class: String,
 	interfaces: Vec<String>,
-	fields: Vec<Field>
+	fields: Vec<Field>,
+	methods: Vec<Method>
 }
 
 impl Serializable for ClassFile {
@@ -35,11 +37,8 @@ impl Serializable for ClassFile {
 			interfaces.push(constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone());
 		}
 		
-		let num_fields = rdr.read_u16::<BigEndian>().unwrap() as usize;
-		let mut fields: Vec<Field> = Vec::with_capacity(num_fields);
-		for _ in 0..num_fields {
-			fields.push(Field::parse(rdr, &version, &constant_pool));
-		}
+		let fields = Fields::parse(rdr, &version, &constant_pool);
+		let methods = Methods::parse(rdr, &version, &constant_pool);
 		
 		ClassFile {
 			magic,
@@ -48,7 +47,8 @@ impl Serializable for ClassFile {
 			this_class,
 			super_class,
 			interfaces,
-			fields
+			fields,
+			methods
 		}
 	}
 	
@@ -56,5 +56,10 @@ impl Serializable for ClassFile {
 		wtr.write_u32::<BigEndian>(self.magic).unwrap();
 		self.version.write(wtr);
 		self.access_flags.write(wtr);
+		
+		let constant_pool = ConstantPool::new();
+		
+		Fields::write(wtr, &self.fields, &constant_pool);
+		Methods::write(wtr, &self.methods, &constant_pool);
 	}
 }

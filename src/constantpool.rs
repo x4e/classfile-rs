@@ -23,7 +23,7 @@ impl ConstantPool {
 			Some(Some(x)) => {
 				x
 			}
-			_ => panic!("Constant pool does not have index {}", index)
+			_ => panic!("Constant pool does not have index {} (0..{})", index, self.inner.len())
 		}
 	}
 	

@@ -19,8 +19,8 @@ impl CodeAttribute {
 		let max_stack = slice.read_u16::<BigEndian>().unwrap();
 		let max_locals = slice.read_u16::<BigEndian>().unwrap();
 		let code_length = slice.read_u32::<BigEndian>().unwrap();
-		let mut code: Vec<u8> = Vec::with_capacity(code_length as usize);
-		slice.take(code_length as u64).read_to_end(&mut code);
+		let mut code: Vec<u8> = vec![0; code_length as usize];
+		slice.read_exact(&mut code).unwrap();
 		let num_exceptions = slice.read_u16::<BigEndian>().unwrap();
 		let mut exceptions: Vec<ExceptionHandler> = Vec::with_capacity(num_exceptions as usize);
 		for _ in 0..num_exceptions {
@@ -50,7 +50,7 @@ pub struct ExceptionHandler {
 	pub start_pc: u16,
 	pub end_pc: u16,
 	pub handler_pc: u16,
-	pub catch_type: String
+	pub catch_type: Option<String>
 }
 
 impl ExceptionHandler {
@@ -58,7 +58,12 @@ impl ExceptionHandler {
 		let start_pc = buf.read_u16::<BigEndian>().unwrap();
 		let end_pc = buf.read_u16::<BigEndian>().unwrap();
 		let handler_pc = buf.read_u16::<BigEndian>().unwrap();
-		let catch_type = constant_pool.utf8(constant_pool.class(buf.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
+		let catch_index = buf.read_u16::<BigEndian>().unwrap();
+		let catch_type = if catch_index > 0 {
+			Some(constant_pool.utf8(constant_pool.class(catch_index).unwrap().name_index).unwrap().str.clone())
+		} else {
+			None
+		};
 		
 		ExceptionHandler {
 			start_pc,

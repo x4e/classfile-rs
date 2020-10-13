@@ -19,8 +19,8 @@ pub struct ClassFile {
 	methods: Vec<Method>
 }
 
-impl Serializable for ClassFile {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
+impl ClassFile {
+	pub fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
 		let magic = rdr.read_u32::<BigEndian>().unwrap();
 		if magic != 0xCAFEBABE {
 			panic!("Invalid class file magic {}", magic);
@@ -52,7 +52,7 @@ impl Serializable for ClassFile {
 		}
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	pub fn write<W: Seek + Write>(&self, wtr: &mut W) {
 		wtr.write_u32::<BigEndian>(self.magic).unwrap();
 		self.version.write(wtr);
 		self.access_flags.write(wtr);

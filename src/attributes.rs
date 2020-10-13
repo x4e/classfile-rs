@@ -2,6 +2,7 @@ use crate::constantpool::{ConstantPool, ConstantType};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::io::{Seek, Write, Read};
 use crate::version::{MajorVersion, ClassVersion};
+use crate::code::CodeAttribute;
 
 #[allow(non_snake_case)]
 pub mod Attributes {
@@ -11,7 +12,7 @@ pub mod Attributes {
 	use crate::version::{ClassVersion};
 	use crate::attributes::{Attribute, AttributeSource};
 	
-	pub fn parse<R: Seek + Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Vec<Attribute> {
+	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Vec<Attribute> {
 		let num_attributes = rdr.read_u16::<BigEndian>().unwrap() as usize;
 		let mut attributes: Vec<Attribute> = Vec::with_capacity(num_attributes);
 		for _ in 0..num_attributes {
@@ -110,11 +111,12 @@ impl UnknownAttribute {
 pub enum Attribute {
 	ConstantValue(ConstantValueAttribute),
 	Signature(SignatureAttribute),
+	Code(CodeAttribute),
 	Unknown(UnknownAttribute)
 }
 
 impl Attribute {
-	pub fn parse<R: Seek + Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Attribute {
+	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Attribute {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>().unwrap()).unwrap().str.clone();
 		let attribute_length = rdr.read_u32::<BigEndian>().unwrap() as usize;
 		let mut buf: Vec<u8> = Vec::with_capacity(attribute_length);
@@ -135,7 +137,11 @@ impl Attribute {
 				}
 			},
 			AttributeSource::Method => {
-				Attribute::Unknown(UnknownAttribute::parse(name, buf))
+				if str == "Code" {
+					Attribute::Code(CodeAttribute::parse(version, constant_pool, buf))
+				} else {
+					Attribute::Unknown(UnknownAttribute::parse(name, buf))
+				}
 			}
 			AttributeSource::Code => {
 				Attribute::Unknown(UnknownAttribute::parse(name, buf))
@@ -147,6 +153,7 @@ impl Attribute {
 		match self {
 			Attribute::ConstantValue(t) => t.write(wtr, constant_pool),
 			Attribute::Signature(t) => t.write(wtr, constant_pool),
+			Attribute::Code(t) => t.write(wtr, constant_pool),
 			Attribute::Unknown(t) => t.write(wtr, constant_pool)
 		}
 	}

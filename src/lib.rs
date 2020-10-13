@@ -2,16 +2,16 @@ mod constantpool;
 
 use std::io::{Seek, Read, Write};
 
-mod classfile;
-mod version;
-mod access;
-mod attributes;
-mod field;
-mod method;
-mod code;
+pub mod classfile;
+pub mod version;
+pub mod access;
+pub mod attributes;
+pub mod field;
+pub mod method;
+pub mod code;
 
 
-trait Serializable {
+pub trait Serializable {
 	fn parse<R: Seek + Read>(rdr: &mut R) -> Self;
 	fn write<W: Seek + Write>(&self, wtr: &mut W);
 }
@@ -22,7 +22,6 @@ mod tests {
 	use std::io::{BufReader, BufWriter};
 	use std::time::Instant;
 	use crate::classfile::ClassFile;
-	use crate::Serializable;
 	
 	#[test]
     fn it_works() {

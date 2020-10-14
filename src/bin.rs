@@ -18,7 +18,7 @@ fn main() {
 		};
 		
 		let elapsed = start.elapsed();
-		println!("{:#?}", class);
+		println!("{:#x?}", class);
 		println!("Finished parsing {} in {:#?}", file, elapsed);
 	} else {
 		panic!("Please provide a file to dissasemble");

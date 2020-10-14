@@ -1,14 +1,15 @@
-mod constantpool;
-
+extern crate derive_more;
 use std::io::{Seek, Read, Write};
 
 pub mod classfile;
+pub mod constantpool;
 pub mod version;
 pub mod access;
 pub mod attributes;
 pub mod field;
 pub mod method;
 pub mod code;
+pub mod ast;
 
 
 pub trait Serializable {
@@ -35,7 +36,7 @@ mod tests {
 		};
 		
 		let elapsed = start.elapsed();
-		println!("{:#?}", class);
+		println!("{:#x?}", class);
 		println!("Finished parsing {} in {:#?}", dir, elapsed);
 		
 		// Write

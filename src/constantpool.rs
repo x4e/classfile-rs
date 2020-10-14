@@ -2,6 +2,7 @@ use crate::Serializable;
 use std::io::{Read, Write, Seek};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::Borrow;
+use derive_more::Constructor;
 
 pub type CPIndex = u16;
 
@@ -157,7 +158,7 @@ impl Serializable for ConstantPool {
 				skip = false;
 				continue
 			}
-			let constant = ConstantType::parse(rdr);
+			let constant = ConstantType::parse(rdr, &inner);
 			match constant {
 				ConstantType::Double(..) | ConstantType::Long(..) => {
 					skip = true;
@@ -177,78 +178,92 @@ impl Serializable for ConstantPool {
 	}
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct ClassInfo {
 	pub name_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct FieldRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct MethodRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct InterfaceMethodRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct StringInfo {
 	pub string_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct IntegerInfo {
 	pub bytes: i32
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct FloatInfo {
 	pub bytes: f32
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct LongInfo {
 	pub bytes: i64
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct DoubleInfo {
 	pub bytes: f64
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct NameAndTypeInfo {
 	pub name_index: CPIndex,
 	pub descriptor_index: CPIndex
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct Utf8Info {
 	pub str: String
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct MethodHandleInfo {
-	pub reference_kind: u8,
-	pub reference_index: CPIndex
+	pub reference: MethodHandleKind
 }
+
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub enum MethodHandleKind {
+	GetField(FieldRefInfo),
+	GetStatic(FieldRefInfo),
+	PutField(FieldRefInfo),
+	PutStatic(FieldRefInfo),
+	InvokeVirtual(MethodRefInfo),
+	NewInvokeSpecial(MethodRefInfo),
+	InvokeStatic((Option<MethodRefInfo>, Option<InterfaceMethodRefInfo>)),
+	InvokeSpecial((Option<MethodRefInfo>, Option<InterfaceMethodRefInfo>)),
+}
+
+
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct MethodTypeInfo {
 	pub descriptor_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct DynamicInfo {
 	pub bootstrap_method_attr_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct InvokeDynamicInfo {
 	pub bootstrap_method_attr_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct ModuleInfo {
 	pub name_index: CPIndex
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
 pub struct PackageInfo {
 	pub name_index: CPIndex
 }
@@ -274,8 +289,8 @@ pub enum ConstantType {
 	Package (PackageInfo)
 }
 
-impl Serializable for ConstantType {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
+impl ConstantType {
+	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &Vec<Option<ConstantType>>) -> Self {
 		let tag = rdr.read_u8().unwrap();
 		match tag {
 			7 => ConstantType::Class {
@@ -380,11 +395,49 @@ impl Serializable for ConstantType {
 					},
 				}
 			},
-			15 => ConstantType::MethodHandle {
-				0: MethodHandleInfo {
-					reference_kind: rdr.read_u8().unwrap(),
-					reference_index: rdr.read_u16::<BigEndian>().unwrap()
-				},
+			15 => {
+				let reference_kind = rdr.read_u8().unwrap();
+				let reference_index = rdr.read_u16::<BigEndian>().unwrap() as usize;
+				let reference = constants.get(reference_index).unwrap().as_ref().unwrap();
+				let handle_kind = match reference_kind {
+					1 => MethodHandleKind::GetField(
+						if let ConstantType::Fieldref(x) = reference {
+							x.clone()
+						} else {
+							panic!("Invalid method handle ref at index {}", reference_index)
+						}
+					),
+					2 => MethodHandleKind::GetStatic(
+						if let ConstantType::Fieldref(x) = reference {
+							x.clone()
+						} else {
+							panic!("Invalid method handle ref at index {}", reference_index)
+						}
+					),
+					3 => MethodHandleKind::PutField(
+						if let ConstantType::Fieldref(x) = reference {
+							x.clone()
+						} else {
+							panic!("Invalid method handle ref at index {}", reference_index)
+						}
+					),
+					4 => MethodHandleKind::PutStatic(
+						if let ConstantType::Fieldref(x) = reference {
+							x.clone()
+						} else {
+							panic!("Invalid method handle ref at index {}", reference_index)
+						}
+					),
+					5 => MethodHandleKind::InvokeVirtual(
+						if let ConstantType::Methodref(x) = reference {
+							x.clone()
+						} else {
+							panic!("Invalid method handle ref at index {}", reference_index)
+						}
+					),
+					_ => panic!("Unknown method handle type {}", reference_kind)
+				};
+				ConstantType::MethodHandle(MethodHandleInfo::new(handle_kind))
 			},
 			16 => ConstantType::MethodType {
 				0: MethodTypeInfo {
@@ -417,7 +470,7 @@ impl Serializable for ConstantType {
 		}
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	pub fn write<W: Seek + Write>(&self, wtr: &mut W) {
 		match self {
 			ConstantType::Class { .. } => {
 				wtr.write_u8(7).unwrap()

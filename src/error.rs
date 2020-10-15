@@ -1,7 +1,6 @@
 use thiserror::Error;
 use std::{io, result};
-use std::option::NoneError;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug};
 
 #[derive(Error, Debug)]
 pub enum ParserError {
@@ -17,13 +16,8 @@ pub enum ParserError {
     #[error("invalid index: {0}")]
     Index(usize),
     #[error("Something was none!")]
-    None(NoneError),
+    None(),
     #[error("unimplemented")]
     Unimplemented
-}
-impl From<NoneError> for ParserError {
-    fn from(e: NoneError) -> Self {
-        Self::None(e)
-    }
 }
 pub type Result<T> = result::Result<T, ParserError>;

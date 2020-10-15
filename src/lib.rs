@@ -1,4 +1,3 @@
-#![feature(try_trait)]
 extern crate derive_more;
 use std::io::{Seek, Read, Write};
 use error::Result;
@@ -23,13 +22,13 @@ pub trait Serializable : Sized {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use std::fs::File;
-	use std::io::{BufReader};
+	use std::io::BufReader;
 	use std::time::Instant;
 	use crate::classfile::ClassFile;
+	use crate::error::Result;
 	
-	fn read() -> ClassFile {
+	fn read() -> Result<ClassFile> {
 		// Read
 		let start = Instant::now();
 		let dir = "Class.class";

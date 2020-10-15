@@ -29,6 +29,12 @@ impl ConstantPool {
 		}
 	}
 	
+	pub fn set(&mut self, index: CPIndex, value: Option<ConstantType>) {
+		let index = index as usize;
+		self.inner.resize(index + 1, None);
+		self.inner[index] = value
+	}
+	
 	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo> {
 		match self.get(index)? {
 			ConstantType::Class(t) => Ok(t),
@@ -203,26 +209,26 @@ impl ConstantPool {
 impl Serializable for ConstantPool {
 	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
 		let size = rdr.read_u16::<BigEndian>()? as usize;
-		let mut inner: Vec<Option<ConstantType>> = vec![None; size];
+		let mut cp = ConstantPool {
+			inner: vec![None; size]
+		};
 		let mut skip = false;
 		for i in 1..size {
 			if skip {
 				skip = false;
 				continue
 			}
-			let constant = ConstantType::parse(rdr, &inner)?;
+			let constant = ConstantType::parse(rdr, &cp)?;
 			match constant {
 				ConstantType::Double(..) | ConstantType::Long(..) => {
 					skip = true;
 				}
 				_ => {}
 			}
-			inner[i] = Some(constant);
+			cp.set(i as CPIndex, Some(constant));
 		}
 		
-		Ok(ConstantPool {
-			inner
-		})
+		Ok(cp)
 	}
 	
 	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
@@ -343,7 +349,7 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
-	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &Vec<Option<ConstantType>>) -> Result<Self> {
+	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &ConstantPool) -> Result<Self> {
 		let tag = rdr.read_u8()?;
 		Ok(match tag {
 			7 => ConstantType::Class {
@@ -451,7 +457,7 @@ impl ConstantType {
 			15 => {
 				let reference_kind = rdr.read_u8()?;
 				let reference_index = rdr.read_u16::<BigEndian>()? as usize;
-				let reference = constants.get(reference_index)?.as_ref()?;
+				let reference = constants.get(reference_index as CPIndex)?;
 				let handle_kind = match reference_kind {
 					1 => MethodHandleKind::GetField(
 						if let ConstantType::Fieldref(x) = reference {

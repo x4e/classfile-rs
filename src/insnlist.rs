@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 
 #[derive(Clone, PartialEq)]
 pub struct InsnList<'u> {
-	insns: Vec<Insn<'u>>,
+	insns: Vec<Insn>,
 	labels: Vec<LabelInsn>,
 	available_labels: Vec<&'u LabelInsn>
 }
@@ -22,7 +22,7 @@ impl InsnList<'_> {
 		if let Some(x) = self.available_labels.pop() {
 			return x
 		}
-		let label = LabelInsn::new(self.labels.len());
+		let label = LabelInsn::new(self.labels.len() as u32);
 		self.labels.push(label);
 		self.labels.last().unwrap()
 	}

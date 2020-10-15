@@ -25,7 +25,7 @@ pub mod Attributes {
 	pub fn write<W: Seek + Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &ConstantPool) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
-			attribute.write(wtr, constant_pool);
+			attribute.write(wtr, constant_pool)?;
 		}
 		Ok(())
 	}

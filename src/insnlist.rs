@@ -6,6 +6,7 @@ pub struct InsnList {
 	labels: u32
 }
 
+#[allow(dead_code)]
 impl InsnList {
 	fn new() -> Self {
 		InsnList {

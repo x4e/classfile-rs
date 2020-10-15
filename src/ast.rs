@@ -48,6 +48,7 @@ pub struct LabelInsn {
 	id: u32
 }
 
+#[allow(dead_code)]
 impl LabelInsn {
 	pub(crate) fn new(id: u32) -> Self {
 		LabelInsn { id }

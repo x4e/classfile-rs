@@ -1,11 +1,9 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use classfile::classfile::ClassFile;
 use std::fs::File;
 use std::io::BufReader;
 
-fn read(mut reader: BufReader<File>) -> ClassFile {
-	// Read
-	let dir = "Class.class";
+fn read(mut reader: BufReader<File>) -> classfile::error::Result<ClassFile> {
 	ClassFile::parse(&mut reader)
 }
 

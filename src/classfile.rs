@@ -55,13 +55,13 @@ impl ClassFile {
 	
 	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		wtr.write_u32::<BigEndian>(self.magic)?;
-		self.version.write(wtr);
-		self.access_flags.write(wtr);
+		self.version.write(wtr)?;
+		self.access_flags.write(wtr)?;
 		
 		let constant_pool = ConstantPool::new();
 		
-		Fields::write(wtr, &self.fields, &constant_pool);
-		Methods::write(wtr, &self.methods, &constant_pool);
+		Fields::write(wtr, &self.fields, &constant_pool)?;
+		Methods::write(wtr, &self.methods, &constant_pool)?;
 		Ok(())
 	}
 }

@@ -24,13 +24,11 @@ pub trait Serializable : Sized {
 mod tests {
 	use std::fs::File;
 	use std::io::BufReader;
-	use std::time::Instant;
 	use crate::classfile::ClassFile;
 	use crate::error::Result;
 	
 	fn read() -> Result<ClassFile> {
 		// Read
-		let start = Instant::now();
 		let dir = "Class.class";
 		let f = File::open(dir).unwrap();
 		let mut reader = BufReader::new(f);

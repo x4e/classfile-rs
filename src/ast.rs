@@ -42,9 +42,16 @@ pub enum ReturnType {
 	Double
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct LabelInsn {
-	id: u32 // unique identifier
+	/// unique identifier
+	id: usize
+}
+
+impl LabelInsn {
+	pub(crate) fn new(id: usize) -> Self {
+		LabelInsn { id }
+	}
 }
 
 #[derive(Constructor, Copy, Clone, PartialEq, Eq)]
@@ -337,8 +344,8 @@ pub struct Nop {}
 pub struct Swap {}
 
 #[derive(Clone, PartialEq)]
-pub enum Insn {
-	Label(LabelInsn),
+pub enum Insn<'u> {
+	Label(&'u LabelInsn),
 	ArrayLoad(ArrayLoadInsn),
 	ArrayStore(ArrayStoreInsn),
 	Ldc(LdcInsn),

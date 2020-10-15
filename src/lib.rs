@@ -10,6 +10,7 @@ pub mod field;
 pub mod method;
 pub mod code;
 pub mod ast;
+pub mod insnlist;
 
 
 pub trait Serializable {

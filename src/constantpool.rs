@@ -19,131 +19,129 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn get(&self, index: CPIndex) -> &ConstantType {
+	pub fn get(&self, index: CPIndex) -> Option<&ConstantType> {
 		match self.inner.get(index as usize) {
-			Some(Some(x)) => {
-				x
-			}
-			_ => panic!("Constant pool does not have index {} (0..{})", index, self.inner.len())
+			Some(Some(x)) => Some(x),
+			_ => None
 		}
 	}
 	
 	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo, String> {
 		match self.get(index) {
-			ConstantType::Class(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Class", index)),
+			Some(ConstantType::Class(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Class, found {:?}", index, x)),
 		}
 	}
 	
 	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo, String> {
 		match self.get(index) {
-			ConstantType::Fieldref(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Fieldref", index)),
+			Some(ConstantType::Fieldref(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Fieldref, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn methodref(&self, index: CPIndex) -> Option<&MethodRefInfo> {
+	pub fn methodref(&self, index: CPIndex) -> Result<&MethodRefInfo, String> {
 		match self.get(index) {
-			ConstantType::Methodref(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Methodref(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Methodref, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn interfacemethodref(&self, index: CPIndex) -> Option<&InterfaceMethodRefInfo> {
+	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&InterfaceMethodRefInfo, String> {
 		match self.get(index) {
-			ConstantType::InterfaceMethodref(t) => Some(t),
-			_ => None,
+			Some(ConstantType::InterfaceMethodref(t)) => Ok(t),
+			x => Err(format!("Index {} is not an InterfaceMethodref, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn string(&self, index: CPIndex) -> Option<&StringInfo> {
+	pub fn string(&self, index: CPIndex) -> Result<&StringInfo, String> {
 		match self.get(index) {
-			ConstantType::String(t) => Some(t),
-			_ => None,
+			Some(ConstantType::String(t)) => Ok(t),
+			x => Err(format!("Index {} is not a String, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn integer(&self, index: CPIndex) -> Option<&IntegerInfo> {
+	pub fn integer(&self, index: CPIndex) -> Result<&IntegerInfo, String> {
 		match self.get(index) {
-			ConstantType::Integer(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Integer(t)) => Ok(t),
+			x => Err(format!("Index {} is not an Integer, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn float(&self, index: CPIndex) -> Option<&FloatInfo> {
+	pub fn float(&self, index: CPIndex) -> Result<&FloatInfo, String> {
 		match self.get(index) {
-			ConstantType::Float(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Float(t)) => Ok(t),
+			x => Err(format!("Index {} is not a String, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn long(&self, index: CPIndex) -> Option<&LongInfo> {
+	pub fn long(&self, index: CPIndex) -> Result<&LongInfo, String> {
 		match self.get(index) {
-			ConstantType::Long(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Long(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Long, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn double(&self, index: CPIndex) -> Option<&DoubleInfo> {
+	pub fn double(&self, index: CPIndex) -> Result<&DoubleInfo, String> {
 		match self.get(index) {
-			ConstantType::Double(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Double(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Double, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn nameandtype(&self, index: CPIndex) -> Option<&NameAndTypeInfo> {
+	pub fn nameandtype(&self, index: CPIndex) -> Result<&NameAndTypeInfo, String> {
 		match self.get(index) {
-			ConstantType::NameAndType(t) => Some(t),
-			_ => None,
+			Some(ConstantType::NameAndType(t)) => Ok(t),
+			x => Err(format!("Index {} is not a NameAndType, found {:?}", index, x)),
 		}
 	}
 	
 	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info, String> {
 		match self.get(index) {
-			ConstantType::Utf8(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Utf8", index)),
+			Some(ConstantType::Utf8(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Utf8, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn methodhandle(&self, index: CPIndex) -> Option<&MethodHandleInfo> {
+	pub fn methodhandle(&self, index: CPIndex) -> Result<&MethodHandleInfo, String> {
 		match self.get(index) {
-			ConstantType::MethodHandle(t) => Some(t),
-			_ => None,
+			Some(ConstantType::MethodHandle(t)) => Ok(t),
+			x => Err(format!("Index {} is not a MethodHandle, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn methodtype(&self, index: CPIndex) -> Option<&MethodTypeInfo> {
+	pub fn methodtype(&self, index: CPIndex) -> Result<&MethodTypeInfo, String> {
 		match self.get(index) {
-			ConstantType::MethodType(t) => Some(t),
-			_ => None,
+			Some(ConstantType::MethodType(t)) => Ok(t),
+			x => Err(format!("Index {} is not a MethodHandle, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn dynamicinfo(&self, index: CPIndex) -> Option<&DynamicInfo> {
+	pub fn dynamicinfo(&self, index: CPIndex) -> Result<&DynamicInfo, String> {
 		match self.get(index) {
-			ConstantType::Dynamic(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Dynamic(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Dynamic, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn invokedynamicinfo(&self, index: CPIndex) -> Option<&InvokeDynamicInfo> {
+	pub fn invokedynamicinfo(&self, index: CPIndex) -> Result<&InvokeDynamicInfo, String> {
 		match self.get(index) {
-			ConstantType::InvokeDynamic(t) => Some(t),
-			_ => None,
+			Some(ConstantType::InvokeDynamic(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Dynamic, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn module(&self, index: CPIndex) -> Option<&ModuleInfo> {
+	pub fn module(&self, index: CPIndex) -> Result<&ModuleInfo, String> {
 		match self.get(index) {
-			ConstantType::Module(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Module(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Module, found {:?}", index, x)),
 		}
 	}
 	
-	pub fn package(&self, index: CPIndex) -> Option<&PackageInfo> {
+	pub fn package(&self, index: CPIndex) -> Result<&PackageInfo, String> {
 		match self.get(index) {
-			ConstantType::Package(t) => Some(t),
-			_ => None,
+			Some(ConstantType::Package(t)) => Ok(t),
+			x => Err(format!("Index {} is not a Package, found {:?}", index, x)),
 		}
 	}
 }

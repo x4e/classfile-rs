@@ -1,5 +1,7 @@
+#![feature(try_trait)]
 extern crate derive_more;
 use std::io::{Seek, Read, Write};
+use error::Result;
 
 pub mod classfile;
 pub mod constantpool;
@@ -11,11 +13,12 @@ pub mod method;
 pub mod code;
 pub mod ast;
 pub mod insnlist;
+pub mod error;
 
 
-pub trait Serializable {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self;
-	fn write<W: Seek + Write>(&self, wtr: &mut W);
+pub trait Serializable : Sized {
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self>;
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()>;
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::io::{Seek, Write, Read};
 use crate::version::{MajorVersion, ClassVersion};
 use crate::code::CodeAttribute;
+use crate::error::Result;
 
 #[allow(non_snake_case)]
 pub mod Attributes {
@@ -12,20 +13,21 @@ pub mod Attributes {
 	use crate::version::{ClassVersion};
 	use crate::attributes::{Attribute, AttributeSource};
 	
-	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Vec<Attribute> {
-		let num_attributes = rdr.read_u16::<BigEndian>().unwrap() as usize;
+	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Attribute>> {
+		let num_attributes = rdr.read_u16::<BigEndian>()? as usize;
 		let mut attributes: Vec<Attribute> = Vec::with_capacity(num_attributes);
 		for _ in 0..num_attributes {
-			attributes.push(Attribute::parse(rdr, &source, version, constant_pool));
+			attributes.push(Attribute::parse(rdr, &source, version, constant_pool)?);
 		}
-		attributes
+		Ok(attributes)
 	}
 	
-	pub fn write<W: Seek + Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &ConstantPool) {
-		wtr.write_u16::<BigEndian>(attributes.len() as u16).unwrap();
+	pub fn write<W: Seek + Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &ConstantPool) -> crate::Result<()> {
+		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
 			attribute.write(wtr, constant_pool);
 		}
+		Ok(())
 	}
 }
 
@@ -44,25 +46,26 @@ pub enum ConstantValue {
 }
 
 impl ConstantValueAttribute {
-	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Self {
-		let index = buf.as_slice().read_u16::<BigEndian>().unwrap();
-		let value = match constant_pool.get(index) {
+	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
+		let index = buf.as_slice().read_u16::<BigEndian>()?;
+		let value = match constant_pool.get(index)? {
 			ConstantType::Long(x) => ConstantValue::Long(x.bytes),
 			ConstantType::Float(x) => ConstantValue::Float(x.bytes),
 			ConstantType::Double(x) => ConstantValue::Double(x.bytes),
 			ConstantType::Integer(x) => ConstantValue::Int(x.bytes),
-			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.string_index).unwrap().str.clone()),
+			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.string_index)?.str.clone()),
 			x => panic!("Invalid constant value type {:#?}", x)
 		};
-		ConstantValueAttribute {
+		Ok(ConstantValueAttribute {
 			value
-		}
+		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) {
-		wtr.write_u16::<BigEndian>(0).unwrap(); // write name
-		wtr.write_u32::<BigEndian>(2).unwrap(); // length
-		wtr.write_u16::<BigEndian>(0).unwrap(); // cp ref
+	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+		wtr.write_u16::<BigEndian>(0)?; // write name
+		wtr.write_u32::<BigEndian>(2)?; // length
+		wtr.write_u16::<BigEndian>(0)?; // cp ref
+		Ok(())
 	}
 }
 
@@ -72,18 +75,19 @@ pub struct SignatureAttribute {
 }
 
 impl SignatureAttribute {
-	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Self {
-		let index = buf.as_slice().read_u16::<BigEndian>().unwrap();
-		let signature = constant_pool.utf8(index).unwrap().str.clone();
-		SignatureAttribute {
+	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
+		let index = buf.as_slice().read_u16::<BigEndian>()?;
+		let signature = constant_pool.utf8(index)?.str.clone();
+		Ok(SignatureAttribute {
 			signature
-		}
+		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) {
-		wtr.write_u16::<BigEndian>(0).unwrap(); // write name
-		wtr.write_u32::<BigEndian>(2).unwrap(); // length
-		wtr.write_u16::<BigEndian>(0).unwrap(); // cp ref
+	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+		wtr.write_u16::<BigEndian>(0)?; // write name
+		wtr.write_u32::<BigEndian>(2)?; // length
+		wtr.write_u16::<BigEndian>(0)?; // cp ref
+		Ok(())
 	}
 }
 
@@ -94,16 +98,17 @@ pub struct UnknownAttribute {
 }
 
 impl UnknownAttribute {
-	pub fn parse(name: String, buf: Vec<u8>) -> Self {
-		UnknownAttribute {
+	pub fn parse(name: String, buf: Vec<u8>) -> Result<Self> {
+		Ok(UnknownAttribute {
 			name, buf
-		}
+		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) {
-		wtr.write_u16::<BigEndian>(0).unwrap(); // write name
-		wtr.write_u32::<BigEndian>(self.buf.len() as u32).unwrap(); // length
-		wtr.write_all(self.buf.as_slice()).unwrap();
+	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+		wtr.write_u16::<BigEndian>(0)?; // write name
+		wtr.write_u32::<BigEndian>(self.buf.len() as u32)?; // length
+		wtr.write_all(self.buf.as_slice())?;
+		Ok(())
 	}
 }
 
@@ -116,40 +121,40 @@ pub enum Attribute {
 }
 
 impl Attribute {
-	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Attribute {
-		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>().unwrap()).unwrap().str.clone();
-		let attribute_length = rdr.read_u32::<BigEndian>().unwrap() as usize;
+	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Attribute> {
+		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
+		let attribute_length = rdr.read_u32::<BigEndian>()? as usize;
 		let mut buf: Vec<u8> = Vec::with_capacity(attribute_length);
-		rdr.take(attribute_length as u64).read_to_end(&mut buf).unwrap();
+		rdr.take(attribute_length as u64).read_to_end(&mut buf)?;
 		let str = name.as_str();
 		
-		match source {
+		Ok(match source {
 			AttributeSource::Class => {
-				Attribute::Unknown(UnknownAttribute::parse(name, buf))
+				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 			},
 			AttributeSource::Field => {
 				if str == "ConstantValue" {
-					Attribute::ConstantValue(ConstantValueAttribute::parse(constant_pool, buf))
+					Attribute::ConstantValue(ConstantValueAttribute::parse(constant_pool, buf)?)
 				} else if str == "Signature" && version.major >= MajorVersion::JAVA_5 {
-					Attribute::Signature(SignatureAttribute::parse(constant_pool, buf))
+					Attribute::Signature(SignatureAttribute::parse(constant_pool, buf)?)
 				} else {
-					Attribute::Unknown(UnknownAttribute::parse(name, buf))
+					Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 				}
 			},
 			AttributeSource::Method => {
 				if str == "Code" {
-					Attribute::Code(CodeAttribute::parse(version, constant_pool, buf))
+					Attribute::Code(CodeAttribute::parse(version, constant_pool, buf)?)
 				} else {
-					Attribute::Unknown(UnknownAttribute::parse(name, buf))
+					Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 				}
 			}
 			AttributeSource::Code => {
-				Attribute::Unknown(UnknownAttribute::parse(name, buf))
+				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 			}
-		}
+		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, constant_pool: &ConstantPool) {
+	pub fn write<T: Seek + Write>(&self, wtr: &mut T, constant_pool: &ConstantPool) -> Result<()> {
 		match self {
 			Attribute::ConstantValue(t) => t.write(wtr, constant_pool),
 			Attribute::Signature(t) => t.write(wtr, constant_pool),

@@ -1,10 +1,11 @@
 use crate::ast::{Insn, LabelInsn};
+use std::borrow::Borrow;
 
 #[derive(Clone, PartialEq)]
 pub struct InsnList<'u> {
 	insns: Vec<Insn<'u>>,
-	labels: Vec<Box<LabelInsn>>,
-	available_labels: Vec<&'u Box<LabelInsn>>
+	labels: Vec<LabelInsn>,
+	available_labels: Vec<&'u LabelInsn>
 }
 
 impl InsnList<'_> {
@@ -17,19 +18,18 @@ impl InsnList<'_> {
 	}
 	
 	/// The givien label will be valid for the lifetime of this list
-	fn new_label<'a>(&'a mut self) -> &'a Box<LabelInsn> {
+	fn new_label(&mut self) -> &LabelInsn {
 		if let Some(x) = self.available_labels.pop() {
 			return x
 		}
-		let label = Box::new(LabelInsn::new(self.labels.len()));
-		let borrow: &'a Box<LabelInsn> = &label;
+		let label = LabelInsn::new(self.labels.len());
 		self.labels.push(label);
-		borrow
+		self.labels.last().unwrap()
 	}
 }
 
 impl <'u> InsnList<'u> {
-	fn release_label(&'u mut self, label: &'u Box<LabelInsn>) {
+	fn release_label(&'u mut self, label: &'u LabelInsn) {
 		self.available_labels.push(label)
 	}
 }

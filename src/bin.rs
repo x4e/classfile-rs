@@ -15,7 +15,7 @@ fn main() {
 			let f = File::open(file).unwrap();
 			let mut reader = BufReader::new(f);
 			ClassFile::parse(&mut reader)
-		};
+		}.unwrap();
 		
 		let elapsed = start.elapsed();
 		println!("{:#x?}", class);

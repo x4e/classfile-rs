@@ -5,6 +5,7 @@ use crate::constantpool::{ConstantPool};
 use byteorder::{ReadBytesExt, BigEndian};
 use crate::attributes::{Attributes, Attribute, AttributeSource};
 use crate::version::ClassVersion;
+use crate::error::Result;
 
 #[allow(non_snake_case)]
 pub mod Fields {
@@ -14,20 +15,21 @@ pub mod Fields {
 	use crate::version::ClassVersion;
 	use crate::constantpool::ConstantPool;
 	
-	pub fn parse<T: Seek + Read>(rdr: &mut T, version: &ClassVersion, constant_pool: &ConstantPool) -> Vec<Field> {
-		let num_fields = rdr.read_u16::<BigEndian>().unwrap() as usize;
+	pub fn parse<T: Seek + Read>(rdr: &mut T, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Field>> {
+		let num_fields = rdr.read_u16::<BigEndian>()? as usize;
 		let mut fields: Vec<Field> = Vec::with_capacity(num_fields);
 		for _ in 0..num_fields {
-			fields.push(Field::parse(rdr, version, constant_pool));
+			fields.push(Field::parse(rdr, version, constant_pool)?);
 		}
-		fields
+		Ok(fields)
 	}
 	
-	pub fn write<T: Seek + Write>(wtr: &mut T, fields: &Vec<Field>, constant_pool: &ConstantPool) {
-		wtr.write_u16::<BigEndian>(fields.len() as u16).unwrap();
+	pub fn write<T: Seek + Write>(wtr: &mut T, fields: &Vec<Field>, constant_pool: &ConstantPool) -> crate::Result<()> {
+		wtr.write_u16::<BigEndian>(fields.len() as u16)?;
 		for field in fields.iter() {
-			field.write(wtr, constant_pool);
+			field.write(wtr, constant_pool)?;
 		}
+		Ok(())
 	}
 }
 
@@ -40,22 +42,23 @@ pub struct Field {
 }
 
 impl Field {
-	pub fn parse<R: Seek + Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Self {
-		let access_flags = FieldAccessFlags::parse(rdr);
-		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>().unwrap()).unwrap().str.clone();
-		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>().unwrap()).unwrap().str.clone();
-		let attributes = Attributes::parse(rdr, AttributeSource::Field, version, constant_pool);
+	pub fn parse<R: Seek + Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Self> {
+		let access_flags = FieldAccessFlags::parse(rdr)?;
+		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
+		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
+		let attributes = Attributes::parse(rdr, AttributeSource::Field, version, constant_pool)?;
 		
-		Field {
+		Ok(Field {
 			access_flags,
 			name,
 			descriptor,
 			attributes
-		}
+		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W, constant_pool: &ConstantPool) {
-		self.access_flags.write(wtr);
-		Attributes::write(wtr, &self.attributes, constant_pool);
+	pub fn write<W: Seek + Write>(&self, wtr: &mut W, constant_pool: &ConstantPool) -> Result<()> {
+		self.access_flags.write(wtr)?;
+		Attributes::write(wtr, &self.attributes, constant_pool)?;
+		Ok(())
 	}
 }

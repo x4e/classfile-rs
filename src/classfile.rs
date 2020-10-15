@@ -6,6 +6,7 @@ use crate::constantpool::{ConstantPool};
 use crate::access::ClassAccessFlags;
 use crate::field::{Field, Fields};
 use crate::method::{Methods, Method};
+use crate::error::{Result, ParserError};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassFile {
@@ -20,27 +21,27 @@ pub struct ClassFile {
 }
 
 impl ClassFile {
-	pub fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let magic = rdr.read_u32::<BigEndian>().unwrap();
+	pub fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let magic = rdr.read_u32::<BigEndian>()?;
 		if magic != 0xCAFEBABE {
-			panic!("Invalid class file magic {}", magic);
+			return Err(ParserError::Unrecognized("header", magic.to_string()));
 		}
-		let version = ClassVersion::parse(rdr);
-		let constant_pool = ConstantPool::parse(rdr);
-		let access_flags = ClassAccessFlags::parse(rdr);
-		let this_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
-		let super_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone();
+		let version = ClassVersion::parse(rdr)?;
+		let constant_pool = ConstantPool::parse(rdr)?;
+		let access_flags = ClassAccessFlags::parse(rdr)?;
+		let this_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
+		let super_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
 		
-		let num_interfaces = rdr.read_u16::<BigEndian>().unwrap() as usize;
+		let num_interfaces = rdr.read_u16::<BigEndian>()? as usize;
 		let mut interfaces: Vec<String> = Vec::with_capacity(num_interfaces);
 		for _ in 0..num_interfaces {
-			interfaces.push(constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>().unwrap()).unwrap().name_index).unwrap().str.clone());
+			interfaces.push(constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone());
 		}
 		
-		let fields = Fields::parse(rdr, &version, &constant_pool);
-		let methods = Methods::parse(rdr, &version, &constant_pool);
+		let fields = Fields::parse(rdr, &version, &constant_pool)?;
+		let methods = Methods::parse(rdr, &version, &constant_pool)?;
 		
-		ClassFile {
+		Ok(ClassFile {
 			magic,
 			version,
 			access_flags,
@@ -49,11 +50,11 @@ impl ClassFile {
 			interfaces,
 			fields,
 			methods
-		}
+		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W) {
-		wtr.write_u32::<BigEndian>(self.magic).unwrap();
+	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+		wtr.write_u32::<BigEndian>(self.magic)?;
 		self.version.write(wtr);
 		self.access_flags.write(wtr);
 		
@@ -61,5 +62,6 @@ impl ClassFile {
 		
 		Fields::write(wtr, &self.fields, &constant_pool);
 		Methods::write(wtr, &self.methods, &constant_pool);
+		Ok(())
 	}
 }

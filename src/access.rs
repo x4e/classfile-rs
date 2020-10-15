@@ -3,8 +3,9 @@
 use crate::Serializable;
 use std::io::{Seek, Read, Write};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use std::fmt::{Debug, Formatter, Error};
+use std::fmt::{Debug, Formatter};
 use std::borrow::Borrow;
+use crate::error::Result;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassAccessFlags {
@@ -12,25 +13,26 @@ pub struct ClassAccessFlags {
 }
 
 impl Serializable for ClassAccessFlags {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let flag = rdr.read_u16::<BigEndian>().unwrap();
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let flag = rdr.read_u16::<BigEndian>()?;
 		let mut flags: Vec<AccessFlag> = Vec::new();
 		for access in CLASS_ACCESSES.iter() {
 			if flag & access.0 != 0 {
 				flags.push(access.clone());
 			}
 		}
-		ClassAccessFlags {
+		Ok(ClassAccessFlags {
 			flags
-		}
+		})
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		let mut flag = 0u16;
 		for access in self.flags.iter() {
 			flag &= access.0;
 		}
-		wtr.write_u16::<BigEndian>(flag).unwrap();
+		wtr.write_u16::<BigEndian>(flag)?;
+		Ok(())
 	}
 }
 
@@ -40,25 +42,26 @@ pub struct FieldAccessFlags {
 }
 
 impl Serializable for FieldAccessFlags {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let flag = rdr.read_u16::<BigEndian>().unwrap();
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let flag = rdr.read_u16::<BigEndian>()?;
 		let mut flags: Vec<AccessFlag> = Vec::new();
 		for access in FIELD_ACCESSES.iter() {
 			if flag & access.0 != 0 {
 				flags.push(access.clone());
 			}
 		}
-		FieldAccessFlags {
+		Ok(FieldAccessFlags {
 			flags
-		}
+		})
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		let mut flag = 0u16;
 		for access in self.flags.iter() {
 			flag &= access.0;
 		}
-		wtr.write_u16::<BigEndian>(flag).unwrap();
+		wtr.write_u16::<BigEndian>(flag)?;
+		Ok(())
 	}
 }
 
@@ -68,25 +71,26 @@ pub struct MethodAccessFlags {
 }
 
 impl Serializable for MethodAccessFlags {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let flag = rdr.read_u16::<BigEndian>().unwrap();
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let flag = rdr.read_u16::<BigEndian>()?;
 		let mut flags: Vec<AccessFlag> = Vec::new();
 		for access in METHOD_ACCESSES.iter() {
 			if flag & access.0 != 0 {
 				flags.push(access.clone());
 			}
 		}
-		MethodAccessFlags {
+		Ok(MethodAccessFlags {
 			flags
-		}
+		})
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		let mut flag = 0u16;
 		for access in self.flags.iter() {
 			flag &= access.0;
 		}
-		wtr.write_u16::<BigEndian>(flag).unwrap();
+		wtr.write_u16::<BigEndian>(flag)?;
+		Ok(())
 	}
 }
 
@@ -96,25 +100,26 @@ pub struct InnerClassAccessFlags {
 }
 
 impl Serializable for InnerClassAccessFlags {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let flag = rdr.read_u16::<BigEndian>().unwrap();
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let flag = rdr.read_u16::<BigEndian>()?;
 		let mut flags: Vec<AccessFlag> = Vec::new();
 		for access in INNERCLASS_ACCESSES.iter() {
 			if flag & access.0 != 0 {
 				flags.push(access.clone());
 			}
 		}
-		InnerClassAccessFlags {
+		Ok(InnerClassAccessFlags {
 			flags
-		}
+		})
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		let mut flag = 0u16;
 		for access in self.flags.iter() {
 			flag &= access.0;
 		}
-		wtr.write_u16::<BigEndian>(flag).unwrap();
+		wtr.write_u16::<BigEndian>(flag)?;
+		Ok(())
 	}
 }
 
@@ -180,8 +185,8 @@ impl ToString for AccessFlag {
 }
 
 impl Debug for AccessFlag {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-		f.write_str(self.to_string().borrow()).unwrap();
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		f.write_str(self.to_string().borrow())?;
 		Ok(())
 	}
 }

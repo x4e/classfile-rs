@@ -3,6 +3,7 @@ use std::io::{Read, Write, Seek};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::Borrow;
 use derive_more::Constructor;
+use crate::error::{Result, ParserError};
 
 pub type CPIndex = u16;
 
@@ -19,138 +20,189 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn get(&self, index: CPIndex) -> &ConstantType {
+	pub fn get(&self, index: CPIndex) -> Result<&ConstantType> {
 		match self.inner.get(index as usize) {
 			Some(Some(x)) => {
-				x
+				Ok(x)
 			}
-			_ => panic!("Constant pool does not have index {} (0..{})", index, self.inner.len())
+			_ => Err(ParserError::Index(index as usize))
 		}
 	}
 	
-	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo, String> {
-		match self.get(index) {
+	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo> {
+		match self.get(index)? {
 			ConstantType::Class(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Class", index)),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Class",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo, String> {
-		match self.get(index) {
+	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo> {
+		match self.get(index)? {
 			ConstantType::Fieldref(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Fieldref", index)),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "FieldRef",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn methodref(&self, index: CPIndex) -> Option<&MethodRefInfo> {
-		match self.get(index) {
-			ConstantType::Methodref(t) => Some(t),
-			_ => None,
+	pub fn methodref(&self, index: CPIndex) -> Result<&MethodRefInfo> {
+		match self.get(index)? {
+			ConstantType::Methodref(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "MethodRef",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn interfacemethodref(&self, index: CPIndex) -> Option<&InterfaceMethodRefInfo> {
-		match self.get(index) {
-			ConstantType::InterfaceMethodref(t) => Some(t),
-			_ => None,
+	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&InterfaceMethodRefInfo> {
+		match self.get(index)? {
+			ConstantType::InterfaceMethodref(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "InterfaceMethodRef",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn string(&self, index: CPIndex) -> Option<&StringInfo> {
-		match self.get(index) {
-			ConstantType::String(t) => Some(t),
-			_ => None,
+	pub fn string(&self, index: CPIndex) -> Result<&StringInfo> {
+		match self.get(index)? {
+			ConstantType::String(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "String",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn integer(&self, index: CPIndex) -> Option<&IntegerInfo> {
-		match self.get(index) {
-			ConstantType::Integer(t) => Some(t),
-			_ => None,
+	pub fn integer(&self, index: CPIndex) -> Result<&IntegerInfo> {
+		match self.get(index)? {
+			ConstantType::Integer(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Integer",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn float(&self, index: CPIndex) -> Option<&FloatInfo> {
-		match self.get(index) {
-			ConstantType::Float(t) => Some(t),
-			_ => None,
+	pub fn float(&self, index: CPIndex) -> Result<&FloatInfo> {
+		match self.get(index)? {
+			ConstantType::Float(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Float",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn long(&self, index: CPIndex) -> Option<&LongInfo> {
-		match self.get(index) {
-			ConstantType::Long(t) => Some(t),
-			_ => None,
+	pub fn long(&self, index: CPIndex) -> Result<&LongInfo> {
+		match self.get(index)? {
+			ConstantType::Long(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Long",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn double(&self, index: CPIndex) -> Option<&DoubleInfo> {
-		match self.get(index) {
-			ConstantType::Double(t) => Some(t),
-			_ => None,
+	pub fn double(&self, index: CPIndex) -> Result<&DoubleInfo> {
+		match self.get(index)? {
+			ConstantType::Double(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Double",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn nameandtype(&self, index: CPIndex) -> Option<&NameAndTypeInfo> {
-		match self.get(index) {
-			ConstantType::NameAndType(t) => Some(t),
-			_ => None,
+	pub fn nameandtype(&self, index: CPIndex) -> Result<&NameAndTypeInfo> {
+		match self.get(index)? {
+			ConstantType::NameAndType(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "NameAndType",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info, String> {
-		match self.get(index) {
+	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info> {
+		match self.get(index)? {
 			ConstantType::Utf8(t) => Ok(t),
-			_ => Err(format!("Index {} is not a Utf8", index)),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "UTF8",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn methodhandle(&self, index: CPIndex) -> Option<&MethodHandleInfo> {
-		match self.get(index) {
-			ConstantType::MethodHandle(t) => Some(t),
-			_ => None,
+	pub fn methodhandle(&self, index: CPIndex) -> Result<&MethodHandleInfo> {
+		match self.get(index)? {
+			ConstantType::MethodHandle(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "MethodHandle",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn methodtype(&self, index: CPIndex) -> Option<&MethodTypeInfo> {
-		match self.get(index) {
-			ConstantType::MethodType(t) => Some(t),
-			_ => None,
+	pub fn methodtype(&self, index: CPIndex) -> Result<&MethodTypeInfo> {
+		match self.get(index)? {
+			ConstantType::MethodType(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "MethodType",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn dynamicinfo(&self, index: CPIndex) -> Option<&DynamicInfo> {
-		match self.get(index) {
-			ConstantType::Dynamic(t) => Some(t),
-			_ => None,
+	pub fn dynamicinfo(&self, index: CPIndex) -> Result<&DynamicInfo> {
+		match self.get(index)? {
+			ConstantType::Dynamic(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Dynamic",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn invokedynamicinfo(&self, index: CPIndex) -> Option<&InvokeDynamicInfo> {
-		match self.get(index) {
-			ConstantType::InvokeDynamic(t) => Some(t),
-			_ => None,
+	pub fn invokedynamicinfo(&self, index: CPIndex) -> Result<&InvokeDynamicInfo> {
+		match self.get(index)? {
+			ConstantType::InvokeDynamic(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "InvokeDynamic",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn module(&self, index: CPIndex) -> Option<&ModuleInfo> {
-		match self.get(index) {
-			ConstantType::Module(t) => Some(t),
-			_ => None,
+	pub fn module(&self, index: CPIndex) -> Result<&ModuleInfo> {
+		match self.get(index)? {
+			ConstantType::Module(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Module",
+				index: index as usize
+			}),
 		}
 	}
 	
-	pub fn package(&self, index: CPIndex) -> Option<&PackageInfo> {
-		match self.get(index) {
-			ConstantType::Package(t) => Some(t),
-			_ => None,
+	pub fn package(&self, index: CPIndex) -> Result<&PackageInfo> {
+		match self.get(index)? {
+			ConstantType::Package(t) => Ok(t),
+			_ => Err(ParserError::IncompatibleCPEntry {
+				expected: "Package",
+				index: index as usize
+			}),
 		}
 	}
 }
 
 impl Serializable for ConstantPool {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Self {
-		let size = rdr.read_u16::<BigEndian>().unwrap() as usize;
+	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+		let size = rdr.read_u16::<BigEndian>()? as usize;
 		let mut inner: Vec<Option<ConstantType>> = vec![None; size];
 		let mut skip = false;
 		for i in 1..size {
@@ -158,7 +210,7 @@ impl Serializable for ConstantPool {
 				skip = false;
 				continue
 			}
-			let constant = ConstantType::parse(rdr, &inner);
+			let constant = ConstantType::parse(rdr, &inner)?;
 			match constant {
 				ConstantType::Double(..) | ConstantType::Long(..) => {
 					skip = true;
@@ -168,13 +220,14 @@ impl Serializable for ConstantPool {
 			inner[i] = Some(constant);
 		}
 		
-		ConstantPool {
+		Ok(ConstantPool {
 			inner
-		}
+		})
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) {
-		wtr.write_u16::<BigEndian>(self.inner.len() as u16).unwrap();
+	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+		wtr.write_u16::<BigEndian>(self.inner.len() as u16)?;
+		Ok(())
 	}
 }
 
@@ -290,68 +343,68 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
-	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &Vec<Option<ConstantType>>) -> Self {
-		let tag = rdr.read_u8().unwrap();
-		match tag {
+	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &Vec<Option<ConstantType>>) -> Result<Self> {
+		let tag = rdr.read_u8()?;
+		Ok(match tag {
 			7 => ConstantType::Class {
 				0: ClassInfo {
-					name_index: rdr.read_u16::<BigEndian>().unwrap()
+					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			9 => ConstantType::Fieldref {
 				0: FieldRefInfo {
-					class_index: rdr.read_u16::<BigEndian>().unwrap(),
-					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+					class_index: rdr.read_u16::<BigEndian>()?,
+					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			10 => ConstantType::Methodref {
 				0: MethodRefInfo {
-					class_index: rdr.read_u16::<BigEndian>().unwrap(),
-					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+					class_index: rdr.read_u16::<BigEndian>()?,
+					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			11 => ConstantType::InterfaceMethodref {
 				0: InterfaceMethodRefInfo {
-					class_index: rdr.read_u16::<BigEndian>().unwrap(),
-					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+					class_index: rdr.read_u16::<BigEndian>()?,
+					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			8 => ConstantType::String {
 				0: StringInfo {
-					string_index: rdr.read_u16::<BigEndian>().unwrap()
+					string_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			3 => ConstantType::Integer {
 				0: IntegerInfo {
-					bytes: rdr.read_i32::<BigEndian>().unwrap()
+					bytes: rdr.read_i32::<BigEndian>()?
 				},
 			},
 			4 => ConstantType::Float {
 				0: FloatInfo {
-					bytes: rdr.read_f32::<BigEndian>().unwrap()
+					bytes: rdr.read_f32::<BigEndian>()?
 				},
 			},
 			5 => ConstantType::Long {
 				0: LongInfo {
-					bytes: rdr.read_i64::<BigEndian>().unwrap()
+					bytes: rdr.read_i64::<BigEndian>()?
 				},
 			},
 			6 => ConstantType::Double {
 				0: DoubleInfo {
-					bytes: rdr.read_f64::<BigEndian>().unwrap()
+					bytes: rdr.read_f64::<BigEndian>()?
 				},
 			},
 			12 => ConstantType::NameAndType {
 				0: NameAndTypeInfo {
-					name_index: rdr.read_u16::<BigEndian>().unwrap(),
-					descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+					name_index: rdr.read_u16::<BigEndian>()?,
+					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			1 => {
-				let length = rdr.read_u16::<BigEndian>().unwrap() as usize;
+				let length = rdr.read_u16::<BigEndian>()? as usize;
 				let mut bytes: Vec<u8> = Vec::with_capacity(length);
 				for _ in 0..length {
-					bytes.push(rdr.read_u8().unwrap());
+					bytes.push(rdr.read_u8()?);
 				}
 				let mut str = String::with_capacity(length);
 				
@@ -363,7 +416,7 @@ impl ConstantType {
 					if c1 & 0x80 == 0 {
 						str.push(c1 as char);
 					} else if c1 & 0xE0 == 0xC0 {
-						let c2 = rdr.read_u8().unwrap();
+						let c2 = rdr.read_u8()?;
 						i += 1;
 						if c2 & 0xC0 == 0x80 {
 							str.push((((c1 & 0x1F) << 6) + (c2 & 0x3F)) as char);
@@ -396,9 +449,9 @@ impl ConstantType {
 				}
 			},
 			15 => {
-				let reference_kind = rdr.read_u8().unwrap();
-				let reference_index = rdr.read_u16::<BigEndian>().unwrap() as usize;
-				let reference = constants.get(reference_index).unwrap().as_ref().unwrap();
+				let reference_kind = rdr.read_u8()?;
+				let reference_index = rdr.read_u16::<BigEndian>()? as usize;
+				let reference = constants.get(reference_index)?.as_ref()?;
 				let handle_kind = match reference_kind {
 					1 => MethodHandleKind::GetField(
 						if let ConstantType::Fieldref(x) = reference {
@@ -441,41 +494,42 @@ impl ConstantType {
 			},
 			16 => ConstantType::MethodType {
 				0: MethodTypeInfo {
-					descriptor_index: rdr.read_u16::<BigEndian>().unwrap()
+					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			17 => ConstantType::Dynamic {
 				0: DynamicInfo {
-					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
-					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
+					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			18 => ConstantType::InvokeDynamic {
 				0: InvokeDynamicInfo {
-					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>().unwrap(),
-					name_and_type_index: rdr.read_u16::<BigEndian>().unwrap()
+					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
+					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			19 => ConstantType::Module {
 				0: ModuleInfo {
-					name_index: rdr.read_u16::<BigEndian>().unwrap()
+					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
 			20 => ConstantType::Package {
 				0: PackageInfo {
-					name_index: rdr.read_u16::<BigEndian>().unwrap()
+					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			_ => panic!("Unknown Constant tag {}", tag)
-		}
+			_ => return Err(ParserError::Unrecognized("constant tag", tag.to_string()))
+		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W) {
+	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		match self {
 			ConstantType::Class { .. } => {
-				wtr.write_u8(7).unwrap()
+				wtr.write_u8(7)?
 			},
-			_ => panic!("Not possible")
+			_ => return Err(ParserError::Unimplemented)
 		}
+		Ok(())
 	}
 }

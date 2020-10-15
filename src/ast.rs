@@ -45,11 +45,11 @@ pub enum ReturnType {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct LabelInsn {
 	/// unique identifier
-	id: usize
+	id: u32
 }
 
 impl LabelInsn {
-	pub(crate) fn new(id: usize) -> Self {
+	pub(crate) fn new(id: u32) -> Self {
 		LabelInsn { id }
 	}
 }
@@ -344,8 +344,8 @@ pub struct Nop {}
 pub struct Swap {}
 
 #[derive(Clone, PartialEq)]
-pub enum Insn<'u> {
-	Label(&'u LabelInsn),
+pub enum Insn {
+	Label(LabelInsn),
 	ArrayLoad(ArrayLoadInsn),
 	ArrayStore(ArrayStoreInsn),
 	Ldc(LdcInsn),

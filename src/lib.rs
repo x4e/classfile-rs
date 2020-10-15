@@ -20,32 +20,23 @@ pub trait Serializable {
 
 #[cfg(test)]
 mod tests {
+	use super::*;
 	use std::fs::File;
-	use std::io::{BufReader, BufWriter};
+	use std::io::{BufReader};
 	use std::time::Instant;
 	use crate::classfile::ClassFile;
 	
-	#[test]
-    fn it_works() {
+	fn read() -> ClassFile {
 		// Read
 		let start = Instant::now();
 		let dir = "Class.class";
-		let class = {
-			let f = File::open(dir).unwrap();
-			let mut reader = BufReader::new(f);
-			ClassFile::parse(&mut reader)
-		};
-		
-		let elapsed = start.elapsed();
-		println!("{:#x?}", class);
-		println!("Finished parsing {} in {:#?}", dir, elapsed);
-		
-		// Write
-		{
-			let dir = "TestOut.class";
-			let f = File::create(dir).unwrap();
-			let mut writer = BufWriter::new(f);
-			class.write(&mut writer);
-		}
+		let f = File::open(dir).unwrap();
+		let mut reader = BufReader::new(f);
+		ClassFile::parse(&mut reader)
+	}
+	
+	#[test]
+    fn print_read() {
+		println!("{:#x?}", read());
     }
 }

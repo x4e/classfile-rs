@@ -4,19 +4,24 @@ use std::fmt::{Debug};
 
 #[derive(Error, Debug)]
 pub enum ParserError {
-    #[error("error reading/writing")]
+    #[error("Error reading/writing")]
     IO(#[from] io::Error),
     #[error("Incompatible Constant Entry (expected {expected:?} at {index:?})")]
     IncompatibleCPEntry {
         expected: &'static str,
+        found: String,
         index: usize
     },
-    #[error("unrecognized {0}: {1}")]
+    #[error("Unrecognized {0}: {1}")]
     Unrecognized(&'static str, String),
-    #[error("invalid index: {0}")]
+    #[error("Invalid constant pool index: {0}")]
     Index(usize),
     #[error("Something was none!")]
     None(),
+    #[error("Unknown Instruction {opcode:X}")]
+    UnknownInstruction {
+	    opcode: u8
+    },
     #[error("unimplemented")]
     Unimplemented
 }

@@ -31,15 +31,18 @@ impl ConstantPool {
 	
 	pub fn set(&mut self, index: CPIndex, value: Option<ConstantType>) {
 		let index = index as usize;
-		self.inner.resize(index + 1, None);
+		if index > self.inner.len() - 1 {
+			self.inner.resize(index + 1, None);
+		}
 		self.inner[index] = value
 	}
 	
 	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo> {
 		match self.get(index)? {
 			ConstantType::Class(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Class",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -48,8 +51,9 @@ impl ConstantPool {
 	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo> {
 		match self.get(index)? {
 			ConstantType::Fieldref(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "FieldRef",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -58,8 +62,9 @@ impl ConstantPool {
 	pub fn methodref(&self, index: CPIndex) -> Result<&MethodRefInfo> {
 		match self.get(index)? {
 			ConstantType::Methodref(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "MethodRef",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -68,8 +73,9 @@ impl ConstantPool {
 	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&InterfaceMethodRefInfo> {
 		match self.get(index)? {
 			ConstantType::InterfaceMethodref(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "InterfaceMethodRef",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -78,8 +84,9 @@ impl ConstantPool {
 	pub fn string(&self, index: CPIndex) -> Result<&StringInfo> {
 		match self.get(index)? {
 			ConstantType::String(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "String",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -88,8 +95,9 @@ impl ConstantPool {
 	pub fn integer(&self, index: CPIndex) -> Result<&IntegerInfo> {
 		match self.get(index)? {
 			ConstantType::Integer(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Integer",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -98,8 +106,9 @@ impl ConstantPool {
 	pub fn float(&self, index: CPIndex) -> Result<&FloatInfo> {
 		match self.get(index)? {
 			ConstantType::Float(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Float",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -108,8 +117,9 @@ impl ConstantPool {
 	pub fn long(&self, index: CPIndex) -> Result<&LongInfo> {
 		match self.get(index)? {
 			ConstantType::Long(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Long",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -118,8 +128,9 @@ impl ConstantPool {
 	pub fn double(&self, index: CPIndex) -> Result<&DoubleInfo> {
 		match self.get(index)? {
 			ConstantType::Double(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Double",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -128,8 +139,9 @@ impl ConstantPool {
 	pub fn nameandtype(&self, index: CPIndex) -> Result<&NameAndTypeInfo> {
 		match self.get(index)? {
 			ConstantType::NameAndType(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "NameAndType",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -138,8 +150,9 @@ impl ConstantPool {
 	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info> {
 		match self.get(index)? {
 			ConstantType::Utf8(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "UTF8",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -148,8 +161,9 @@ impl ConstantPool {
 	pub fn methodhandle(&self, index: CPIndex) -> Result<&MethodHandleInfo> {
 		match self.get(index)? {
 			ConstantType::MethodHandle(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "MethodHandle",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -158,8 +172,9 @@ impl ConstantPool {
 	pub fn methodtype(&self, index: CPIndex) -> Result<&MethodTypeInfo> {
 		match self.get(index)? {
 			ConstantType::MethodType(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "MethodType",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -168,8 +183,9 @@ impl ConstantPool {
 	pub fn dynamicinfo(&self, index: CPIndex) -> Result<&DynamicInfo> {
 		match self.get(index)? {
 			ConstantType::Dynamic(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Dynamic",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -178,8 +194,9 @@ impl ConstantPool {
 	pub fn invokedynamicinfo(&self, index: CPIndex) -> Result<&InvokeDynamicInfo> {
 		match self.get(index)? {
 			ConstantType::InvokeDynamic(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "InvokeDynamic",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -188,8 +205,9 @@ impl ConstantPool {
 	pub fn module(&self, index: CPIndex) -> Result<&ModuleInfo> {
 		match self.get(index)? {
 			ConstantType::Module(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Module",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}
@@ -198,8 +216,9 @@ impl ConstantPool {
 	pub fn package(&self, index: CPIndex) -> Result<&PackageInfo> {
 		match self.get(index)? {
 			ConstantType::Package(t) => Ok(t),
-			_ => Err(ParserError::IncompatibleCPEntry {
+			x => Err(ParserError::IncompatibleCPEntry {
 				expected: "Package",
+				found: format!("{:#?}", x),
 				index: index as usize
 			}),
 		}

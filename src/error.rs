@@ -22,7 +22,13 @@ pub enum ParserError {
     UnknownInstruction {
 	    opcode: u8
     },
-    #[error("unimplemented")]
-    Unimplemented
+    #[error("Unimplemented {name:?}")]
+    Unimplemented {
+	    name: &'static str
+    },
+	#[error("{name:?}")]
+	Other {
+		name: &'static str
+	}
 }
 pub type Result<T> = result::Result<T, ParserError>;

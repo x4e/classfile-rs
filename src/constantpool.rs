@@ -4,12 +4,27 @@ use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::Borrow;
 use derive_more::Constructor;
 use crate::error::{Result, ParserError};
+use enum_display_derive::DisplayDebug;
+use std::fmt::{Debug, Formatter};
 
 pub type CPIndex = u16;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ConstantPool {
 	inner: Vec<Option<ConstantType>>
+}
+
+impl Debug for ConstantPool {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let mut list = f.debug_list();
+		for x in self.inner.iter() {
+			match x {
+				Some(x) => list.entry(x),
+				None => list.entry(x)
+			};
+		}
+		list.finish()
+	}
 }
 
 #[allow(dead_code)]
@@ -346,7 +361,7 @@ pub struct PackageInfo {
 	pub name_index: CPIndex
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, DisplayDebug)]
 pub enum ConstantType {
 	Class (ClassInfo),
 	Fieldref (FieldRefInfo),
@@ -553,7 +568,9 @@ impl ConstantType {
 			ConstantType::Class { .. } => {
 				wtr.write_u8(7)?
 			},
-			_ => return Err(ParserError::Unimplemented)
+			_ => return Err(ParserError::Unimplemented {
+				name: "Constant Pool Writing"
+			})
 		}
 		Ok(())
 	}

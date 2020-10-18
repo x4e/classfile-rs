@@ -1,14 +1,17 @@
 use derive_more::Constructor;
 use std::collections::HashMap;
+use std::fmt::Debug;
+use enum_display_derive::DisplayDebug;
+use crate::constantpool::MethodHandleInfo;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
 	Reference(Option<String>), // If None then the reference refers to no particular class
-	Primitive(Primitive)
+	Primitive(PrimitiveType)
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum Primitive {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PrimitiveType {
 	Boolean,
 	Byte,
 	Char,
@@ -19,7 +22,7 @@ pub enum Primitive {
 	Double
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
 	Reference,
 	Int,
@@ -28,7 +31,7 @@ pub enum OpType {
 	Long
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReturnType {
 	Void,
 	Reference,
@@ -42,7 +45,7 @@ pub enum ReturnType {
 	Double
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LabelInsn {
 	/// unique identifier
 	id: u32
@@ -55,133 +58,148 @@ impl LabelInsn {
 	}
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct ArrayLoadInsn {
-	pub kind: OpType,
+	pub kind: Type,
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct ArrayStoreInsn {
-	pub kind: OpType,
+	pub kind: Type,
 }
 
-#[derive(Constructor, Clone, PartialEq)]
+#[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct LdcInsn {
 	pub constant: LdcType
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LdcType {
 	Null,
 	String(String),
 	Int(i32),
 	Float(f32),
 	Long(i64),
-	Double(f64)
+	Double(f64),
+	Class(String),
+	/// Method Descriptor (java.lang.invoke.MethodType)
+	MethodType(String),
+	/// TODO: Method Handle (java.lang.invoke.MethodHandle)
+	MethodHandle(),
+	// TODO: Constant_Dynamic
+	Dynamic()
 }
 
 /// Loads a value from the local array slot
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LocalLoadInsn {
 	pub kind: OpType,
 	pub index: u16 // u8 with normal load, u16 with wide load
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LocalStoreInsn {
 	pub kind: OpType,
 	pub index: u16 // u8 with normal load, u16 with wide load
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct NewArrayInsn {
 	pub kind: Type,
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ReturnInsn {
 	pub kind: ReturnType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ArrayLengthInsn {}
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ThrowInsn {}
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct CheckCastInsn {
 	pub kind: String
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ConvertInsn {
-	pub from: Primitive,
-	pub to: Primitive
+	pub from: PrimitiveType,
+	pub to: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AddInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CompareInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType,
+	/// If both values are NAN and this flag is set, 1 will be pushed. Otherwise -1 will be pushed.
+	pub pos_on_nan: bool
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DivideInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct MultiplyInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NegateInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RemainderInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SubtractInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AndInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OrInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct XorInsn {
-	pub kind: Primitive
+	pub kind: PrimitiveType
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct ShiftLeft {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ShiftLeftInsn {
+	pub kind: OpType
+}
 
 /// Arithmetically shift right
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct ShiftRight {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ShiftRightInsn {
+	pub kind: OpType
+}
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct LogicalShiftRight {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct LogicalShiftRightInsn {
+	pub kind: OpType
+}
 
 /// duplicates the value at the top of the stack
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct DupInsn {
 	/// The number of items to duplicate
 	pub num: u8,
@@ -189,13 +207,13 @@ pub struct DupInsn {
 	pub down: u8
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct Pop {
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct PopInsn {
 	/// The number of items to pop
 	pub num: u8,
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct GetFieldInsn {
 	/// Is this field an instance or static field?
 	pub instance: bool,
@@ -207,7 +225,7 @@ pub struct GetFieldInsn {
 	pub descriptor: String,
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct PutFieldInsn {
 	/// Is this field an instance or static field?
 	pub instance: bool,
@@ -220,18 +238,18 @@ pub struct PutFieldInsn {
 }
 
 /// Unconditional Jump
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct JumpInsn<'u> {
-	pub jump_to: &'u LabelInsn
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct JumpInsn {
+	pub jump_to: LabelInsn
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct ConditionalJumpInsn<'u> {
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ConditionalJumpInsn {
 	pub condition: JumpCondition,
-	pub jump_to: &'u LabelInsn
+	pub jump_to: LabelInsn
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum JumpCondition {
 	IsNull,
 	NotNull,
@@ -239,10 +257,10 @@ pub enum JumpCondition {
 	ReferencesNotEqual,
 	IntsEq,
 	IntsNotEq,
-	IntLessThan,
-	IntLessThanOrEq,
-	IntGreaterThan,
-	IntGreaterThanOrEq,
+	IntsLessThan,
+	IntsLessThanOrEq,
+	IntsGreaterThan,
+	IntsGreaterThanOrEq,
 	IntEqZero,
 	IntNotEqZero,
 	IntLessThanZero,
@@ -251,7 +269,7 @@ pub enum JumpCondition {
 	IntGreaterThanOrEqZero,
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IncrementIntInsn {
 	/// Index of the local variable
 	pub index: u16,
@@ -259,28 +277,39 @@ pub struct IncrementIntInsn {
 	pub amount: i16
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct InstanceOfInsn {
 	pub class: String
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct InvokeDynamicInsn {
 	pub name: String,
 	pub descriptor: String,
 	pub bootstrap_type: BootstrapMethodType,
 	pub bootstrap_class: String,
 	pub bootstrap_method: String,
-	pub bootstrap_descriptor: String
+	pub bootstrap_descriptor: String,
+	pub bootstrap_arguments: Vec<BootstrapArgument>
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum BootstrapArgument {
+	Int(i32),
+	Float(f32),
+	Long(i64),
+	Double(f64),
+	Class(String)
+	// TODO: Continue. Do we have to do this for every constant type? Spec seems to suggest so
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BootstrapMethodType {
 	InvokeStatic,
 	NewInvokeSpecial
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
 pub struct InvokeInsn {
 	pub kind: InvokeType,
 	pub class: String,
@@ -288,7 +317,7 @@ pub struct InvokeInsn {
 	pub descriptor: String
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InvokeType {
 	Instance,
 	Static,
@@ -296,55 +325,67 @@ pub enum InvokeType {
 	Special
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
-pub struct LookupSwitchInsn<'u> {
-	pub default: &'u LabelInsn,
-	pub cases: HashMap<i32, &'u LabelInsn>
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+pub struct LookupSwitchInsn {
+	pub default: LabelInsn,
+	pub cases: HashMap<i32, LabelInsn>
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
-pub struct TableSwitchInsn<'u> {
-	pub default: &'u LabelInsn,
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+pub struct TableSwitchInsn {
+	pub default: LabelInsn,
 	pub(crate) low: i32,
-	pub(crate) cases: Vec<&'u LabelInsn>
+	pub(crate) cases: Vec<LabelInsn>
 }
 
-impl<'u> TableSwitchInsn<'u> {
+impl TableSwitchInsn {
 	#[allow(dead_code)]
-	fn get(&self, case: i32) -> Option<&'u LabelInsn> {
+	fn get(&self, case: i32) -> Option<LabelInsn> {
 		if let Some(x) = self.cases.get((case - self.low) as usize) {
-			Some(*x)
+			Some(x.clone())
 		} else {
 			None
 		}
 	}
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct MonitorEnter {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct MonitorEnterInsn {}
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct MonitorExit {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct MonitorExitInsn {}
 
 /// New multi dimensional object array
-#[derive(Constructor, Clone, PartialEq, Eq)]
-pub struct MultiNewArray {
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+pub struct MultiNewArrayInsn {
 	pub kind: String,
 	pub dimensions: u8
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
-pub struct NewObject {
+#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+pub struct NewObjectInsn {
 	pub kind: String
 }
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct Nop {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct NopInsn {}
 
-#[derive(Constructor, Copy, Clone, PartialEq, Eq)]
-pub struct Swap {}
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SwapInsn {}
 
-#[derive(Clone, PartialEq)]
+/// Implementation dependent insn
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ImpDep1Insn {}
+
+/// Implementation dependent insn
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ImpDep2Insn {}
+
+/// Used by debuggers
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BreakPointInsn {}
+
+#[derive(Clone, PartialEq, DisplayDebug)]
 pub enum Insn {
 	Label(LabelInsn),
 	ArrayLoad(ArrayLoadInsn),
@@ -357,4 +398,39 @@ pub enum Insn {
 	ArrayLength(ArrayLengthInsn),
 	Throw(ThrowInsn),
 	CheckCast(CheckCastInsn),
+	Convert(ConvertInsn),
+	Add(AddInsn),
+	Compare(CompareInsn),
+	Divide(DivideInsn),
+	Multiply(MultiplyInsn),
+	Negate(NegateInsn),
+	Remainder(RemainderInsn),
+	Subtract(SubtractInsn),
+	And(AndInsn),
+	Or(OrInsn),
+	Xor(XorInsn),
+	ShiftLeft(ShiftLeftInsn),
+	ShiftRight(ShiftRightInsn),
+	LogicalShiftRight(LogicalShiftRightInsn),
+	Dup(DupInsn),
+	Pop(PopInsn),
+	GetField(GetFieldInsn),
+	PutField(PutFieldInsn),
+	Jump(JumpInsn),
+	ConditionalJump(ConditionalJumpInsn),
+	IncrementInt(IncrementIntInsn),
+	InstanceOf(InstanceOfInsn),
+	InvokeDynamic(InvokeDynamicInsn),
+	Invoke(InvokeInsn),
+	LookupSwitch(LookupSwitchInsn),
+	TableSwitch(TableSwitchInsn),
+	MonitorEnter(MonitorEnterInsn),
+	MonitorExit(MonitorExitInsn),
+	MultiNewArray(MultiNewArrayInsn),
+	NewObject(NewObjectInsn),
+	Nop(NopInsn),
+	Swap(SwapInsn),
+	ImpDep1(ImpDep1Insn),
+	ImpDep2(ImpDep2Insn),
+	BreakPoint(BreakPointInsn)
 }

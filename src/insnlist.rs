@@ -1,9 +1,9 @@
 use crate::ast::{Insn, LabelInsn};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct InsnList {
-	insns: Vec<Insn>,
-	labels: u32
+	pub insns: Vec<Insn>,
+	pub(crate) labels: u32
 }
 
 #[allow(dead_code)]

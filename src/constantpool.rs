@@ -40,7 +40,7 @@ impl ConstantPool {
 			Some(Some(x)) => {
 				Ok(x)
 			}
-			_ => Err(ParserError::Index(index as usize))
+			_ => Err(ParserError::bad_cp_index(index))
 		}
 	}
 	
@@ -55,187 +55,187 @@ impl ConstantPool {
 	pub fn class(&self, index: CPIndex) -> Result<&ClassInfo> {
 		match self.get(index)? {
 			ConstantType::Class(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Class",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Class",
+			    format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn fieldref(&self, index: CPIndex) -> Result<&FieldRefInfo> {
 		match self.get(index)? {
 			ConstantType::Fieldref(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "FieldRef",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"FieldRef",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn methodref(&self, index: CPIndex) -> Result<&MethodRefInfo> {
 		match self.get(index)? {
 			ConstantType::Methodref(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "MethodRef",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"MethodRef",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&InterfaceMethodRefInfo> {
 		match self.get(index)? {
 			ConstantType::InterfaceMethodref(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "InterfaceMethodRef",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"InterfaceMethodRef",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn string(&self, index: CPIndex) -> Result<&StringInfo> {
 		match self.get(index)? {
 			ConstantType::String(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "String",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"String",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn integer(&self, index: CPIndex) -> Result<&IntegerInfo> {
 		match self.get(index)? {
 			ConstantType::Integer(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Integer",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Integer",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn float(&self, index: CPIndex) -> Result<&FloatInfo> {
 		match self.get(index)? {
 			ConstantType::Float(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Float",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Float",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn long(&self, index: CPIndex) -> Result<&LongInfo> {
 		match self.get(index)? {
 			ConstantType::Long(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Long",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Long",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn double(&self, index: CPIndex) -> Result<&DoubleInfo> {
 		match self.get(index)? {
 			ConstantType::Double(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Double",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Double",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn nameandtype(&self, index: CPIndex) -> Result<&NameAndTypeInfo> {
 		match self.get(index)? {
 			ConstantType::NameAndType(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "NameAndType",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"NameAndType",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn utf8(&self, index: CPIndex) -> Result<&Utf8Info> {
 		match self.get(index)? {
 			ConstantType::Utf8(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "UTF8",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Utf8",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn methodhandle(&self, index: CPIndex) -> Result<&MethodHandleInfo> {
 		match self.get(index)? {
 			ConstantType::MethodHandle(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "MethodHandle",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"MethodHandle",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn methodtype(&self, index: CPIndex) -> Result<&MethodTypeInfo> {
 		match self.get(index)? {
 			ConstantType::MethodType(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "MethodType",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"MethodType",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn dynamicinfo(&self, index: CPIndex) -> Result<&DynamicInfo> {
 		match self.get(index)? {
 			ConstantType::Dynamic(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Dynamic",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Dynamic",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn invokedynamicinfo(&self, index: CPIndex) -> Result<&InvokeDynamicInfo> {
 		match self.get(index)? {
 			ConstantType::InvokeDynamic(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "InvokeDynamic",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"InvokeDynamic",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn module(&self, index: CPIndex) -> Result<&ModuleInfo> {
 		match self.get(index)? {
 			ConstantType::Module(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Module",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Module",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 	
 	pub fn package(&self, index: CPIndex) -> Result<&PackageInfo> {
 		match self.get(index)? {
 			ConstantType::Package(t) => Ok(t),
-			x => Err(ParserError::IncompatibleCPEntry {
-				expected: "Package",
-				found: format!("{:#?}", x),
-				index: index as usize
-			}),
+			x => Err(ParserError::incomp_cp(
+				"Package",
+				format!("{:#?}", x),
+				index as usize
+			)),
 		}
 	}
 }
@@ -559,7 +559,7 @@ impl ConstantType {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			_ => return Err(ParserError::Unrecognized("constant tag", tag.to_string()))
+			_ => return Err(ParserError::unrecognised("constant tag", tag.to_string()))
 		})
 	}
 	
@@ -568,9 +568,7 @@ impl ConstantType {
 			ConstantType::Class { .. } => {
 				wtr.write_u8(7)?
 			},
-			_ => return Err(ParserError::Unimplemented {
-				name: "Constant Pool Writing"
-			})
+			_ => return Err(ParserError::unimplemented("Constant Pool Writing"))
 		}
 		Ok(())
 	}

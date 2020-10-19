@@ -13,6 +13,7 @@ pub mod code;
 pub mod ast;
 pub mod insnlist;
 pub mod error;
+mod utils;
 
 
 pub trait Serializable : Sized {
@@ -29,7 +30,7 @@ mod tests {
 	
 	fn read() -> Result<ClassFile> {
 		// Read
-		let dir = "Class.class";
+		let dir = "Object.class";
 		let f = File::open(dir).unwrap();
 		let mut reader = BufReader::new(f);
 		ClassFile::parse(&mut reader)

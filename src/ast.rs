@@ -2,7 +2,6 @@ use derive_more::Constructor;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use enum_display_derive::DisplayDebug;
-use crate::constantpool::MethodHandleInfo;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {

@@ -6,8 +6,6 @@ use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
-use crate::ast::Insn::NewObject;
-use crate::ast::Type::Primitive;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -622,12 +620,12 @@ impl InsnParser {
 							let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
 							let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
 							Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor))
-						}
-						x => return Err(ParserError::IncompatibleCPEntry {
-							expected: "(interface)methodref",
-							found: format!("{:#?}", x),
-							index: method_index as usize
-						})
+						},
+						x => return Err(ParserError::incomp_cp(
+							"(interface)methodref",
+							format!("{:#?}", x),
+							method_index as usize
+						))
 					}
 				},
 				InsnParser::INVOKESTATIC => {
@@ -748,7 +746,7 @@ impl InsnParser {
 						9 => PrimitiveType::Short,
 						10 => PrimitiveType::Int,
 						11 => PrimitiveType::Long,
-						_ => return Err(ParserError::Other {name: "Unknown Primitive Type"})
+						_ => return Err(ParserError::other("Unknown Primitive Type"))
 					};
 					Insn::NewArray(NewArrayInsn::new(Type::Primitive(kind)))
 				},
@@ -785,7 +783,7 @@ impl InsnParser {
 				InsnParser::SWAP => Insn::Swap(SwapInsn::new()),
 				// TODO InsnParser::TABLESWITCH =>
 				// TODO InsnParser::WIDE =>
-				_ => return Err(ParserError::UnknownInstruction { opcode })
+				_ => return Err(ParserError::unknown_insn(opcode))
 			};
 			//println!("{:#?}", insn);
 			insns.push(insn);
@@ -815,17 +813,13 @@ impl InsnParser {
 			ConstantType::Long(x) => LdcType::Long(x.bytes),
 			ConstantType::Class(x) => LdcType::Class(constant_pool.utf8(x.name_index)?.str.clone()),
 			ConstantType::MethodType(x) => LdcType::MethodType(constant_pool.utf8(x.descriptor_index)?.str.clone()),
-			ConstantType::MethodHandle(x) => return Err(ParserError::Unimplemented {
-				name: "MethodHandle LDC"
-			}),
-			ConstantType::Dynamic(x) => return Err(ParserError::Unimplemented {
-				name: "Dynamic LDC"
-			}),
-			_ => return Err(ParserError::IncompatibleCPEntry {
-				expected: "LDC Constant Type",
-				found: format!("{:#?}", constant),
-				index: index as usize
-			})
+			ConstantType::MethodHandle(x) => return Err(ParserError::unimplemented("MethodHandle LDC")),
+			ConstantType::Dynamic(x) => return Err(ParserError::unimplemented("Dynamic LDC")),
+			x => return Err(ParserError::incomp_cp(
+				"LDC Constant Type",
+				format!("{:#?}", constant),
+				index as usize
+			))
 		};
 		Ok(Insn::Ldc(LdcInsn::new(ldc_type)))
 	}

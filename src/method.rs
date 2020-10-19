@@ -7,6 +7,7 @@ use crate::Serializable;
 use byteorder::{BigEndian, ReadBytesExt};
 use crate::error::Result;
 use crate::utils::mut_retain;
+use crate::insnlist::InsnList;
 
 #[allow(non_snake_case)]
 pub mod Methods {
@@ -41,6 +42,7 @@ pub struct Method {
 	descriptor: String,
 	signature: Option<String>,
 	exceptions: Vec<String>,
+	code: Option<InsnList>,
 	attributes: Vec<Attribute>
 }
 
@@ -51,6 +53,7 @@ impl Method {
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let mut signature: Option<String> = None;
 		let mut exceptions: Vec<String> = Vec::new();
+		let mut code: Option<InsnList> = None;
 		let mut attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
 		
 		mut_retain(&mut attributes, |attribute| {
@@ -66,6 +69,12 @@ impl Method {
 					std::mem::swap(&mut exceptions, &mut exceptions_attr.exceptions);
 					false
 				},
+				Attribute::Code(code_attr) => {
+					let mut rep = InsnList::new();
+					std::mem::swap(&mut rep, &mut code_attr.code);
+					code = Some(rep);
+					false
+				}
 				_ => true
 			}
 		});
@@ -76,6 +85,7 @@ impl Method {
 			descriptor,
 			signature,
 			exceptions,
+			code,
 			attributes
 		})
 	}

@@ -6,6 +6,7 @@ use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -302,9 +303,10 @@ impl InsnParser {
 		let mut insns: Vec<Insn> = Vec::with_capacity(num_insns_estimate);
 		let mut num_labels: u32 = 0;
 		
-		let mut index_pc_arr: Vec<u32> = Vec::with_capacity(num_insns_estimate);
+		let mut pc_index_map: HashMap<u32, u32> = HashMap::with_capacity(num_insns_estimate);
 		
 		let mut pc: u32 = 0;
+		let mut index: u32 = 0;
 		while pc < length {
 			let this_pc = pc;
 			let opcode = rdr.read_u8()?;
@@ -787,14 +789,28 @@ impl InsnParser {
 			};
 			//println!("{:#?}", insn);
 			insns.push(insn);
-			index_pc_arr.push(this_pc);
+			pc_index_map.insert(this_pc, index);
 			
 			pc += 1;
+			index += 1;
 		}
 		
 		// Remap labels to indexes
 		for insn in insns.iter() {
-		
+			match insn {
+				Insn::Jump(x) => {
+				},
+				Insn::ConditionalJump(x) => {
+				
+				},
+				Insn::LookupSwitch(x) => {
+				
+				},
+				Insn::TableSwitch(x) => {
+				
+				},
+				_ => {}
+			}
 		}
 		
 		Ok(InsnList {

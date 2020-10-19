@@ -92,6 +92,34 @@ impl SignatureAttribute {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ExceptionsAttribute {
+	pub exceptions: Vec<String>
+}
+
+impl ExceptionsAttribute {
+	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
+		let mut slice = buf.as_slice();
+		let num_exceptions = slice.read_u16::<BigEndian>()?;
+		let mut exceptions: Vec<String> = Vec::with_capacity(num_exceptions as usize);
+		for _ in 0..num_exceptions {
+			exceptions.push(constant_pool.utf8(constant_pool.class(slice.read_u16::<BigEndian>()?)?.name_index)?.str.clone());
+		}
+		Ok(ExceptionsAttribute {
+			exceptions
+		})
+	}
+	
+	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
+		for _exception in self.exceptions.iter() {
+			// write exception
+			wtr.write_u16::<BigEndian>(0)?;
+		}
+		Ok(())
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct UnknownAttribute {
 	pub name: String,
 	pub buf: Vec<u8>
@@ -117,6 +145,7 @@ pub enum Attribute {
 	ConstantValue(ConstantValueAttribute),
 	Signature(SignatureAttribute),
 	Code(CodeAttribute),
+	Exceptions(ExceptionsAttribute),
 	Unknown(UnknownAttribute)
 }
 
@@ -144,6 +173,10 @@ impl Attribute {
 			AttributeSource::Method => {
 				if str == "Code" {
 					Attribute::Code(CodeAttribute::parse(version, constant_pool, buf)?)
+				} else if str == "Signature" && version.major >= MajorVersion::JAVA_5 {
+					Attribute::Signature(SignatureAttribute::parse(constant_pool, buf)?)
+				} else if str == "Exceptions" {
+					Attribute::Exceptions(ExceptionsAttribute::parse(constant_pool, buf)?)
 				} else {
 					Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 				}
@@ -159,6 +192,7 @@ impl Attribute {
 			Attribute::ConstantValue(t) => t.write(wtr, constant_pool),
 			Attribute::Signature(t) => t.write(wtr, constant_pool),
 			Attribute::Code(t) => t.write(wtr, constant_pool),
+			Attribute::Exceptions(t) => t.write(wtr, constant_pool),
 			Attribute::Unknown(t) => t.write(wtr, constant_pool)
 		}
 	}

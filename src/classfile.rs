@@ -10,11 +10,13 @@ use crate::error::{Result, ParserError};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassFile {
-	magic: u32, /// 0xCAFEBABE
+	/// 0xCAFEBABE
+	magic: u32,
 	version: ClassVersion,
 	access_flags: ClassAccessFlags,
 	this_class: String,
-	super_class: String,
+	/// Can be None for example for java/lang/Object
+	super_class: Option<String>,
 	interfaces: Vec<String>,
 	fields: Vec<Field>,
 	methods: Vec<Method>
@@ -24,13 +26,16 @@ impl ClassFile {
 	pub fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
 		let magic = rdr.read_u32::<BigEndian>()?;
 		if magic != 0xCAFEBABE {
-			return Err(ParserError::Unrecognized("header", magic.to_string()));
+			return Err(ParserError::unrecognised("header", magic.to_string()));
 		}
 		let version = ClassVersion::parse(rdr)?;
 		let constant_pool = ConstantPool::parse(rdr)?;
 		let access_flags = ClassAccessFlags::parse(rdr)?;
 		let this_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
-		let super_class = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
+		let super_class = match rdr.read_u16::<BigEndian>()? {
+			0 => None,
+			i => Some(constant_pool.utf8(constant_pool.class(i)?.name_index)?.str.clone())
+		};
 		
 		let num_interfaces = rdr.read_u16::<BigEndian>()? as usize;
 		let mut interfaces: Vec<String> = Vec::with_capacity(num_interfaces);

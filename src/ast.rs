@@ -47,7 +47,7 @@ pub enum ReturnType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LabelInsn {
 	/// unique identifier
-	id: u32
+	pub(crate) id: u32
 }
 
 #[allow(dead_code)]

@@ -24,7 +24,7 @@ impl InsnList {
 	}
 	
 	/// The givien label will be valid for the lifetime of this list
-	fn new_label(&mut self) -> LabelInsn {
+	pub fn new_label(&mut self) -> LabelInsn {
 		let id = self.labels;
 		self.labels += 1;
 		LabelInsn::new(id)

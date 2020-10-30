@@ -6,7 +6,9 @@ use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
-use std::collections::HashMap;
+use std::collections::{HashMap};
+use std::mem;
+use std::ptr::null_mut;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -301,7 +303,7 @@ impl InsnParser {
 	fn parse_insns<'m, T: Read>(constant_pool: &ConstantPool, mut rdr: T, length: u32) -> Result<InsnList> {
 		let num_insns_estimate = length as usize / 3; // conservative assumption average 3 bytes per insn
 		let mut insns: Vec<Insn> = Vec::with_capacity(num_insns_estimate);
-		let mut num_labels: u32 = 0;
+		let mut required_labels: u32 = 0;
 		
 		let mut pc_index_map: HashMap<u32, u32> = HashMap::with_capacity(num_insns_estimate);
 		
@@ -310,6 +312,7 @@ impl InsnParser {
 		while pc < length {
 			let this_pc = pc;
 			let opcode = rdr.read_u8()?;
+			pc += 1;
 			//println!("Parsing {:X?}", opcode);
 			
 			let insn = match opcode {
@@ -450,13 +453,15 @@ impl InsnParser {
 					Insn::GetField(GetFieldInsn::new(false, class, name, descriptor))
 				},
 				InsnParser::GOTO => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					Insn::Jump(JumpInsn::new(LabelInsn::new(to as u32)))
+					required_labels += 1;
+					Insn::Jump(JumpInsn::new(LabelInsn::new(to)))
 				},
 				InsnParser::GOTO_W => {
-					let to = rdr.read_u32::<BigEndian>()?;
+					let to = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
 					pc += 4;
+					required_labels += 1;
 					Insn::Jump(JumpInsn::new(LabelInsn::new(to)))
 				},
 				InsnParser::I2B => Insn::Convert(ConvertInsn::new(PrimitiveType::Int, PrimitiveType::Byte)),
@@ -478,83 +483,99 @@ impl InsnParser {
 				InsnParser::ICONST_5 => Insn::Ldc(LdcInsn::new(LdcType::Int(5))),
 				InsnParser::IDIV => Insn::Divide(DivideInsn::new(PrimitiveType::Int)),
 				InsnParser::IF_ACMPEQ => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesEqual, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ACMPNE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesNotEqual, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPEQ => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsEq, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPGE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThanOrEq, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPGT => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThan, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPLE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThanOrEq, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPLT => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThan, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IF_ICMPNE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsNotEq, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFEQ => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntEqZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFGE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanOrEqZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFGT => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFLE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanOrEqZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFLT => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFNE => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntNotEqZero, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFNONNULL => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::NotNull, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IFNULL => {
-					let to = rdr.read_u16::<BigEndian>()?;
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
+					required_labels += 1;
 					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IsNull, LabelInsn::new(to as u32)))
 				},
 				InsnParser::IINC => {
@@ -791,32 +812,76 @@ impl InsnParser {
 			insns.push(insn);
 			pc_index_map.insert(this_pc, index);
 			
-			pc += 1;
 			index += 1;
 		}
 		
-		// Remap labels to indexes
-		for insn in insns.iter() {
-			match insn {
-				Insn::Jump(x) => {
-				},
-				Insn::ConditionalJump(x) => {
-				
-				},
-				Insn::LookupSwitch(x) => {
-				
-				},
-				Insn::TableSwitch(x) => {
-				
-				},
-				_ => {}
+		let mut list = InsnList {
+			insns: Vec::with_capacity(0),
+			labels: 0
+		};
+		
+		if required_labels > 0 {
+			let mut insert: HashMap<usize, Vec<Insn>> = HashMap::with_capacity(required_labels as usize);
+			// Remap labels to indexes
+			for insn in insns.iter_mut() {
+				match insn {
+					Insn::Jump(x) => {
+						let mut jump_to = list.new_label();
+						let mut insert_into = *match pc_index_map.get(&x.jump_to.id) {
+							Some(x) => x,
+							_ => panic!("Out of bounds jump instruction")
+						};
+						x.jump_to.id = jump_to.id;
+						
+						for (i, insns) in insert.iter() {
+							for _ in 0..insns.len() {
+								if insert_into as usize > *i {
+									insert_into += 1;
+								}
+							}
+						}
+						insert.entry(insert_into as usize)
+							.or_insert(Vec::with_capacity(1))
+							.push(Insn::Label(jump_to));
+					},
+					Insn::ConditionalJump(x) => {
+						let mut jump_to = list.new_label();
+						let mut insert_into = *pc_index_map.get(&x.jump_to.id).expect(format!("Out of bounds jump instruction (PC: {})", x.jump_to.id).as_str());
+						x.jump_to.id = jump_to.id;
+						
+						for (i, insns) in insert.iter() {
+							for _ in 0..insns.len() {
+								if insert_into as usize > *i {
+									insert_into += 1;
+								}
+							}
+						}
+						insert.entry(insert_into as usize)
+							.or_insert(Vec::with_capacity(1))
+							.push(Insn::Label(jump_to));
+					},
+					_ => {}
+				}
+			}
+			insns.reserve_exact(insert.len());
+			for (index, insert) in insert.iter_mut() {
+				let index = *index;
+				let mut empty = Vec::with_capacity(0);
+				mem::swap(insert, &mut empty);
+				for insn in empty.iter_mut() {
+					let mut empty: Insn = unsafe { std::mem::zeroed() };
+					mem::swap(insn, &mut empty);
+					if index <= insns.len() {
+						insns.insert(index, empty);
+					} else {
+						insns.push(empty);
+					}
+				}
 			}
 		}
+		list.insns = insns;
 		
-		Ok(InsnList {
-			insns,
-			labels: num_labels
-		})
+		Ok(list)
 	}
 	
 	fn parse_ldc(index: CPIndex, constant_pool: &ConstantPool) -> Result<Insn> {

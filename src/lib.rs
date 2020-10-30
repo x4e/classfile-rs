@@ -28,16 +28,24 @@ mod tests {
 	use crate::classfile::ClassFile;
 	use crate::error::Result;
 	
-	fn read() -> Result<ClassFile> {
+	fn read(dir: &str) -> Result<ClassFile> {
 		// Read
-		let dir = "Object.class";
 		let f = File::open(dir).unwrap();
 		let mut reader = BufReader::new(f);
 		ClassFile::parse(&mut reader)
 	}
 	
-	#[test]
-    fn print_read() {
-		println!("{:#x?}", read());
+    fn print_read(dir: &str) {
+		println!("{:#x?}", read(dir));
     }
+	
+	#[test]
+	fn class_class() {
+		read("Class.class");
+	}
+	
+	#[test]
+	fn object_class() {
+		print_read("Object.class");
+	}
 }

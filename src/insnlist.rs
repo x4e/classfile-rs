@@ -1,5 +1,5 @@
 use crate::ast::{Insn, LabelInsn};
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter,};
 
 #[derive(Clone, PartialEq)]
 pub struct InsnList {

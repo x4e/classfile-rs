@@ -24,6 +24,8 @@ pub enum ParserError {
     },
     #[error("Unimplemented {0}")]
     Unimplemented(&'static str),
+	#[error("Out of bounds jump index {0}")]
+	OutOfBoundsJumpIndex(i32),
 	#[error("{0}")]
 	Other(&'static str)
 }
@@ -69,6 +71,10 @@ impl ParserError {
 	
 	pub fn unimplemented(name: &'static str) -> Self {
 		ParserError::Unimplemented(name).check_panic()
+	}
+	
+	pub fn out_of_bounds_jump(index: i32) -> Self {
+		ParserError::OutOfBoundsJumpIndex(index).check_panic()
 	}
 	
 	pub fn other(name: &'static str) -> Self {

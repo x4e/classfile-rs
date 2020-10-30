@@ -41,7 +41,7 @@ mod tests {
 	
 	#[test]
 	fn class_class() {
-		read("Class.class");
+		read("Class.class").unwrap();
 	}
 	
 	#[test]

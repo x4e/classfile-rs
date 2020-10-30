@@ -8,7 +8,6 @@ use crate::ast::*;
 use crate::insnlist::InsnList;
 use std::collections::{HashMap};
 use std::mem;
-use std::ptr::null_mut;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -824,43 +823,28 @@ impl InsnParser {
 			let mut insert: HashMap<usize, Vec<Insn>> = HashMap::with_capacity(required_labels as usize);
 			// Remap labels to indexes
 			for insn in insns.iter_mut() {
-				match insn {
-					Insn::Jump(x) => {
-						let mut jump_to = list.new_label();
-						let mut insert_into = *match pc_index_map.get(&x.jump_to.id) {
-							Some(x) => x,
-							_ => panic!("Out of bounds jump instruction")
-						};
-						x.jump_to.id = jump_to.id;
-						
-						for (i, insns) in insert.iter() {
-							for _ in 0..insns.len() {
-								if insert_into as usize > *i {
-									insert_into += 1;
-								}
+				if let Some(mut x) = match insn {
+					Insn::Jump(x) => Some(x.jump_to),
+					Insn::ConditionalJump(x) => Some(x.jump_to),
+					_ => None
+				} {
+					let jump_to = list.new_label();
+					let mut insert_into = *match pc_index_map.get(&x.id) {
+						Some(x) => x,
+						_ => return Err(ParserError::out_of_bounds_jump(x.id as i32))
+					};
+					x.id = jump_to.id;
+					
+					for (i, insns) in insert.iter() {
+						for _ in 0..insns.len() {
+							if insert_into as usize > *i {
+								insert_into += 1;
 							}
 						}
-						insert.entry(insert_into as usize)
-							.or_insert(Vec::with_capacity(1))
-							.push(Insn::Label(jump_to));
-					},
-					Insn::ConditionalJump(x) => {
-						let mut jump_to = list.new_label();
-						let mut insert_into = *pc_index_map.get(&x.jump_to.id).expect(format!("Out of bounds jump instruction (PC: {})", x.jump_to.id).as_str());
-						x.jump_to.id = jump_to.id;
-						
-						for (i, insns) in insert.iter() {
-							for _ in 0..insns.len() {
-								if insert_into as usize > *i {
-									insert_into += 1;
-								}
-							}
-						}
-						insert.entry(insert_into as usize)
-							.or_insert(Vec::with_capacity(1))
-							.push(Insn::Label(jump_to));
-					},
-					_ => {}
+					}
+					insert.entry(insert_into as usize)
+						.or_insert(Vec::with_capacity(1))
+						.push(Insn::Label(jump_to));
 				}
 			}
 			insns.reserve_exact(insert.len());

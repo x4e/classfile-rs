@@ -497,38 +497,38 @@ impl ConstantType {
 						if let ConstantType::Fieldref(x) = reference {
 							x.clone()
 						} else {
-							panic!("Invalid method handle ref at index {}", reference_index)
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
 						}
 					),
 					2 => MethodHandleKind::GetStatic(
 						if let ConstantType::Fieldref(x) = reference {
 							x.clone()
 						} else {
-							panic!("Invalid method handle ref at index {}", reference_index)
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
 						}
 					),
 					3 => MethodHandleKind::PutField(
 						if let ConstantType::Fieldref(x) = reference {
 							x.clone()
 						} else {
-							panic!("Invalid method handle ref at index {}", reference_index)
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
 						}
 					),
 					4 => MethodHandleKind::PutStatic(
 						if let ConstantType::Fieldref(x) = reference {
 							x.clone()
 						} else {
-							panic!("Invalid method handle ref at index {}", reference_index)
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
 						}
 					),
 					5 => MethodHandleKind::InvokeVirtual(
 						if let ConstantType::Methodref(x) = reference {
 							x.clone()
 						} else {
-							panic!("Invalid method handle ref at index {}", reference_index)
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
 						}
 					),
-					_ => panic!("Unknown method handle type {}", reference_kind)
+					x => return Err(ParserError::other(format!("Unknown method handle type {}", x)))
 				};
 				ConstantType::MethodHandle(MethodHandleInfo::new(handle_kind))
 			},

@@ -41,11 +41,11 @@ mod tests {
 	
 	#[test]
 	fn class_class() {
-		read("Class.class").unwrap();
+		read("classes/testing/Class.class").unwrap();
 	}
 	
 	#[test]
 	fn object_class() {
-		print_read("Object.class");
+		print_read("classes/testing/Object.class");
 	}
 }

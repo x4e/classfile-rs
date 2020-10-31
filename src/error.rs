@@ -27,7 +27,7 @@ pub enum ParserError {
 	#[error("Out of bounds jump index {0}")]
 	OutOfBoundsJumpIndex(i32),
 	#[error("{0}")]
-	Other(&'static str)
+	Other(String)
 }
 
 impl ParserError {
@@ -77,8 +77,9 @@ impl ParserError {
 		ParserError::OutOfBoundsJumpIndex(index).check_panic()
 	}
 	
-	pub fn other(name: &'static str) -> Self {
-		ParserError::Other(name).check_panic()
+	pub fn other<T>(name: T) -> Self
+		where T: Into<String> {
+		ParserError::Other(name.into()).check_panic()
 	}
 }
 

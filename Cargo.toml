@@ -22,6 +22,7 @@ enum-display-derive = { git = "https://github.com/bytechef/enum-display-derive" 
 
 [dev-dependencies]
 criterion = "0.3.3"
+rayon = "1.4.1"
 
 [[bench]]
 name = "read_class"

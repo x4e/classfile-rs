@@ -57,7 +57,7 @@ impl ConstantPool {
 			ConstantType::Class(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Class",
-			    format!("{:#?}", x),
+			    x,
 				index as usize
 			)),
 		}
@@ -68,7 +68,31 @@ impl ConstantPool {
 			ConstantType::Fieldref(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"FieldRef",
-				format!("{:#?}", x),
+				x,
+				index as usize
+			)),
+		}
+	}
+	
+	pub fn any_method(&self, index: CPIndex) -> Result<(String, String, String)> {
+		match self.get(index)? {
+			ConstantType::Methodref(method) => {
+				let name_and_type = self.nameandtype(method.name_and_type_index)?;
+				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
+				let name = self.utf8(name_and_type.name_index)?.str.clone();
+				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
+				Ok((class, name, descriptor))
+			},
+			ConstantType::InterfaceMethodref(method) => {
+				let name_and_type = self.nameandtype(method.name_and_type_index)?;
+				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
+				let name = self.utf8(name_and_type.name_index)?.str.clone();
+				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
+				Ok((class, name, descriptor))
+			},
+			x => Err(ParserError::incomp_cp(
+				"AnyMethodRef",
+				x,
 				index as usize
 			)),
 		}
@@ -79,7 +103,7 @@ impl ConstantPool {
 			ConstantType::Methodref(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"MethodRef",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -90,7 +114,7 @@ impl ConstantPool {
 			ConstantType::InterfaceMethodref(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"InterfaceMethodRef",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -101,7 +125,7 @@ impl ConstantPool {
 			ConstantType::String(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"String",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -112,7 +136,7 @@ impl ConstantPool {
 			ConstantType::Integer(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Integer",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -123,7 +147,7 @@ impl ConstantPool {
 			ConstantType::Float(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Float",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -134,7 +158,7 @@ impl ConstantPool {
 			ConstantType::Long(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Long",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -145,7 +169,7 @@ impl ConstantPool {
 			ConstantType::Double(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Double",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -156,7 +180,7 @@ impl ConstantPool {
 			ConstantType::NameAndType(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"NameAndType",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -167,7 +191,7 @@ impl ConstantPool {
 			ConstantType::Utf8(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Utf8",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -178,7 +202,7 @@ impl ConstantPool {
 			ConstantType::MethodHandle(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"MethodHandle",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -189,7 +213,7 @@ impl ConstantPool {
 			ConstantType::MethodType(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"MethodType",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -200,7 +224,7 @@ impl ConstantPool {
 			ConstantType::Dynamic(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Dynamic",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -211,7 +235,7 @@ impl ConstantPool {
 			ConstantType::InvokeDynamic(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"InvokeDynamic",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -222,7 +246,7 @@ impl ConstantPool {
 			ConstantType::Module(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Module",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}
@@ -233,7 +257,7 @@ impl ConstantPool {
 			ConstantType::Package(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
 				"Package",
-				format!("{:#?}", x),
+				x,
 				index as usize
 			)),
 		}

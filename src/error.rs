@@ -1,15 +1,16 @@
 use thiserror::Error;
 use std::{io, result};
 use std::fmt::{Debug};
+use crate::constantpool::ConstantType;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
     #[error("Error reading/writing")]
     IO(io::Error),
-    #[error("Incompatible Constant Entry (expected {expected:?} at {index:?})")]
+    #[error("Incompatible Constant Entry (expected {expected:#?} at {index:?})")]
     IncompatibleCPEntry {
         expected: &'static str,
-        found: String,
+        found: ConstantType,
         index: usize
     },
     #[error("Unrecognized {0}: {1}")]
@@ -34,7 +35,7 @@ impl ParserError {
 	fn check_panic(self) -> Self {
 		if let Ok(x) = std::env::var("PANIC_ON_ERR") {
 			if x == "1" || x == "true" {
-				panic!("{:#?}", self)
+				panic!("{:#x?}", self)
 			}
 		}
 		self
@@ -44,10 +45,10 @@ impl ParserError {
 		ParserError::IO(inner).check_panic()
 	}
 	
-	pub fn incomp_cp(expected: &'static str, found: String, index: usize) -> Self {
+	pub fn incomp_cp(expected: &'static str, found: &ConstantType, index: usize) -> Self {
 		ParserError::IncompatibleCPEntry {
 			expected,
-			found,
+			found: found.clone(),
 			index
 		}.check_panic()
 	}

@@ -627,47 +627,19 @@ impl InsnParser {
 				InsnParser::INVOKESPECIAL => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let method_ref = constant_pool.get(method_index)?;
-					match method_ref {
-						ConstantType::Methodref(method) => {
-							let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
-							let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
-							let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
-							let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
-							Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor))
-						},
-						ConstantType::InterfaceMethodref(method) => {
-							let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
-							let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
-							let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
-							let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
-							Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor))
-						},
-						x => return Err(ParserError::incomp_cp(
-							"(interface)methodref",
-							format!("{:#?}", x),
-							method_index as usize
-						))
-					}
+					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
+					Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor))
 				},
 				InsnParser::INVOKESTATIC => {
-					let method = constant_pool.methodref(rdr.read_u16::<BigEndian>()?)?;
+					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					
-					let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
-					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
-					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
-					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
+					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
 					Insn::Invoke(InvokeInsn::new(InvokeType::Static, class, name, descriptor))
 				},
 				InsnParser::INVOKEVIRTUAL => {
-					let method = constant_pool.methodref(rdr.read_u16::<BigEndian>()?)?;
+					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					
-					let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
-					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
-					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
-					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
+					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
 					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor))
 				},
 				InsnParser::IOR => Insn::Or(OrInsn::new(PrimitiveType::Int)),
@@ -882,7 +854,7 @@ impl InsnParser {
 			ConstantType::Dynamic(x) => return Err(ParserError::unimplemented("Dynamic LDC")),
 			x => return Err(ParserError::incomp_cp(
 				"LDC Constant Type",
-				format!("{:#?}", constant),
+				constant,
 				index as usize
 			))
 		};

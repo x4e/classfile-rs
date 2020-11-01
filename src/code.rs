@@ -821,7 +821,59 @@ impl InsnParser {
 						cases
 					})
 				},
-				// TODO InsnParser::WIDE =>
+				InsnParser::WIDE => {
+					let opcode = rdr.read_u8()?;
+					pc += 1;
+					match opcode {
+						InsnParser::ILOAD => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalLoad(LocalLoadInsn::new(OpType::Int, index))
+						},
+						InsnParser::FLOAD => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalLoad(LocalLoadInsn::new(OpType::Float, index))
+						},
+						InsnParser::ALOAD => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalLoad(LocalLoadInsn::new(OpType::Reference, index))
+						},
+						InsnParser::LLOAD => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalLoad(LocalLoadInsn::new(OpType::Long, index))
+						},
+						InsnParser::DLOAD => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalLoad(LocalLoadInsn::new(OpType::Double, index))
+						},
+						InsnParser::ISTORE => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalStore(LocalStoreInsn::new(OpType::Int, index))
+						},
+						InsnParser::FSTORE => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalStore(LocalStoreInsn::new(OpType::Float, index))
+						},
+						InsnParser::LSTORE => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalStore(LocalStoreInsn::new(OpType::Long, index))
+						},
+						InsnParser::DSTORE => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							pc += 2;
+							Insn::LocalStore(LocalStoreInsn::new(OpType::Double, index))
+						},
+						InsnParser::RET => unimplemented!("Wide Ret instructions are not implemented"),
+						_ => return Err(ParserError::invalid_insn(this_pc, format!("Invalid wide opcode {:x}", opcode)))
+					}
+				}
 				_ => return Err(ParserError::unknown_insn(opcode))
 			};
 			//println!("{:#?}", insn);

@@ -23,6 +23,11 @@ pub enum ParserError {
     UnknownInstruction {
 	    opcode: u8
     },
+    #[error("Invalid Instruction {pc} {msg}")]
+    InvalidInstruction {
+        pc: u32,
+	    msg: String
+    },
     #[error("Unimplemented {0}")]
     Unimplemented(&'static str),
 	#[error("Out of bounds jump index {0}")]
@@ -68,6 +73,14 @@ impl ParserError {
 	
 	pub fn unknown_insn(opcode: u8) -> Self {
 		ParserError::UnknownInstruction { opcode }.check_panic()
+	}
+	
+	pub fn invalid_insn<T>(pc: u32, msg: T) -> Self
+		where T: Into<String> {
+		ParserError::InvalidInstruction {
+			pc,
+			msg: msg.into()
+		}
 	}
 	
 	pub fn unimplemented(name: &'static str) -> Self {

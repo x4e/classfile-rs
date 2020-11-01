@@ -23,8 +23,9 @@ pub trait Serializable : Sized {
 
 #[cfg(test)]
 mod tests {
-	use std::fs::File;
+	use std::fs::{self, File, DirEntry};
 	use std::io::BufReader;
+	use std::process::Command;
 	use crate::classfile::ClassFile;
 	use crate::error::Result;
 	
@@ -39,13 +40,52 @@ mod tests {
 		println!("{:#x?}", read(dir));
     }
 	
-	#[test]
-	fn class_class() {
-		read("classes/testing/Class.class").unwrap();
+	fn walk(dir: &str, op: &dyn Fn(DirEntry) -> Result<()>) -> Result<()> {
+		for entry in fs::read_dir(dir)? {
+			let entry = entry?;
+			op(entry)?;
+		}
+		Ok(())
 	}
 	
 	#[test]
-	fn object_class() {
-		print_read("classes/testing/Object.class");
+	fn test_classes() -> Result<()> {
+		walk("classes/testing/", &|entry| {
+			let path = entry.path();
+			if path.is_file() {
+				let extension = path.extension().unwrap().to_str().unwrap();
+				if extension == "class" {
+					fs::remove_file(path)?;
+				}
+			}
+			Ok(())
+		})?;
+		walk("classes/testing/", &|entry| {
+			let path = entry.path();
+			if path.is_file() {
+				let extension = path.extension().unwrap().to_str().unwrap();
+				if extension == "java" {
+					let output = Command::new("javac")
+						.args(&[path.into_os_string().to_str().unwrap()])
+						.output()
+						.unwrap();
+					if !output.stderr.is_empty() {
+						panic!("{}", String::from_utf8(output.stderr).unwrap());
+					}
+				}
+			}
+			Ok(())
+		})?;
+		walk("classes/testing/", &|entry| {
+			let path = entry.path();
+			if path.is_file() {
+				let extension = path.extension().unwrap().to_str().unwrap();
+				if extension == "class" {
+					print_read(path.into_os_string().to_str().unwrap());
+				}
+			}
+			Ok(())
+		})?;
+		Ok(())
 	}
 }

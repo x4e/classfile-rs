@@ -6,6 +6,7 @@ use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
+use crate::utils::ReadUtils;
 use std::collections::{HashMap};
 use std::mem;
 
@@ -697,7 +698,28 @@ impl InsnParser {
 				InsnParser::LLOAD_3 => Insn::LocalLoad(LocalLoadInsn::new(OpType::Long, 3)),
 				InsnParser::LMUL => Insn::Multiply(MultiplyInsn::new(PrimitiveType::Long)),
 				InsnParser::LNEG => Insn::Negate(NegateInsn::new(PrimitiveType::Long)),
-				// TODO InsnParser::LOOKUPSWITCH =>
+				InsnParser::LOOKUPSWITCH => {
+					let pad = 3 - (this_pc % 4);
+					rdr.read_nbytes(pad as usize)?;
+					
+					let default = LabelInsn::new((rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32);
+					let npairs = rdr.read_i32::<BigEndian>()? as u32;
+					
+					let mut cases: HashMap<i32, LabelInsn> = HashMap::with_capacity(npairs as usize);
+					for i in 0..npairs {
+						let matc = rdr.read_i32::<BigEndian>()?;
+						let jump = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+						cases.insert(matc, LabelInsn::new(jump));
+					}
+					
+					pc += pad + (2 * 4) + (npairs * 2 * 4);
+					required_labels += npairs + 1;
+					
+					Insn::LookupSwitch(LookupSwitchInsn {
+						default,
+						cases
+					})
+				}
 				InsnParser::LREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Long)),
 				InsnParser::LRETURN => Insn::Return(ReturnInsn::new(ReturnType::Long)),
 				InsnParser::LSHL => Insn::ShiftLeft(ShiftLeftInsn::new(OpType::Long)),
@@ -775,7 +797,30 @@ impl InsnParser {
 					Insn::Ldc(LdcInsn::new(LdcType::Int(short as i32)))
 				},
 				InsnParser::SWAP => Insn::Swap(SwapInsn::new()),
-				// TODO InsnParser::TABLESWITCH =>
+				InsnParser::TABLESWITCH => {
+					let pad = 3 - (this_pc % 4);
+					rdr.read_nbytes(pad as usize)?;
+					
+					let default = LabelInsn::new((rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32);
+					
+					let low = rdr.read_i32::<BigEndian>()?;
+					let high = rdr.read_i32::<BigEndian>()?;
+					let num_cases = (high - low + 1) as u32;
+					let mut cases: Vec<LabelInsn> = Vec::with_capacity(num_cases as usize);
+					for i in 0..num_cases {
+						let case = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+						cases.push(LabelInsn::new(case));
+					}
+					
+					pc += pad + ((3 + num_cases) * 4);
+					required_labels += num_cases + 1;
+					
+					Insn::TableSwitch(TableSwitchInsn {
+						default,
+						low,
+						cases
+					})
+				},
 				// TODO InsnParser::WIDE =>
 				_ => return Err(ParserError::unknown_insn(opcode))
 			};
@@ -795,28 +840,22 @@ impl InsnParser {
 			let mut insert: HashMap<usize, Vec<Insn>> = HashMap::with_capacity(required_labels as usize);
 			// Remap labels to indexes
 			for insn in insns.iter_mut() {
-				if let Some(mut x) = match insn {
-					Insn::Jump(x) => Some(x.jump_to),
-					Insn::ConditionalJump(x) => Some(x.jump_to),
-					_ => None
-				} {
-					let jump_to = list.new_label();
-					let mut insert_into = *match pc_index_map.get(&x.id) {
-						Some(x) => x,
-						_ => return Err(ParserError::out_of_bounds_jump(x.id as i32))
-					};
-					x.id = jump_to.id;
-					
-					for (i, insns) in insert.iter() {
-						for _ in 0..insns.len() {
-							if insert_into as usize > *i {
-								insert_into += 1;
-							}
+				match insn {
+					Insn::Jump(x) => InsnParser::remap_label_nodes(&mut x.jump_to, &mut list, &pc_index_map, &mut insert)?,
+					Insn::ConditionalJump(x) => InsnParser::remap_label_nodes(&mut x.jump_to, &mut list, &pc_index_map, &mut insert)?,
+					Insn::TableSwitch(x) => {
+						InsnParser::remap_label_nodes(&mut x.default, &mut list, &pc_index_map, &mut insert)?;
+						for case in x.cases.iter_mut() {
+							InsnParser::remap_label_nodes(case, &mut list, &pc_index_map, &mut insert)?
 						}
 					}
-					insert.entry(insert_into as usize)
-						.or_insert(Vec::with_capacity(1))
-						.push(Insn::Label(jump_to));
+					Insn::LookupSwitch(x) => {
+						InsnParser::remap_label_nodes(&mut x.default, &mut list, &pc_index_map, &mut insert)?;
+						for (case, jump) in x.cases.iter_mut() {
+							InsnParser::remap_label_nodes(jump, &mut list, &pc_index_map, &mut insert)?
+						}
+					}
+					_ => {}
 				}
 			}
 			insns.reserve_exact(insert.len());
@@ -838,6 +877,27 @@ impl InsnParser {
 		list.insns = insns;
 		
 		Ok(list)
+	}
+	
+	fn remap_label_nodes(x: &mut LabelInsn, list: &mut InsnList, pc_index_map: &HashMap<u32, u32>, insert: &mut HashMap<usize, Vec<Insn>>) -> Result<()> {
+		let jump_to = list.new_label();
+		let mut insert_into = *match pc_index_map.get(&x.id) {
+			Some(x) => x,
+			_ => return Err(ParserError::out_of_bounds_jump(x.id as i32))
+		};
+		x.id = jump_to.id;
+		
+		for (i, insns) in insert.iter() {
+			for _ in 0..insns.len() {
+				if insert_into as usize > *i {
+					insert_into += 1;
+				}
+			}
+		}
+		insert.entry(insert_into as usize)
+			.or_insert(Vec::with_capacity(1))
+			.push(Insn::Label(jump_to));
+		Ok(())
 	}
 	
 	fn parse_ldc(index: CPIndex, constant_pool: &ConstantPool) -> Result<Insn> {

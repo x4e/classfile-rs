@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use enum_display_derive::DisplayDebug;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -324,13 +324,41 @@ pub enum InvokeType {
 	Special
 }
 
-#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+#[derive(Constructor, Clone, PartialEq, Eq)]
 pub struct LookupSwitchInsn {
 	pub default: LabelInsn,
-	pub cases: HashMap<i32, LabelInsn>
+	pub(crate) cases: HashMap<i32, LabelInsn>
 }
 
-#[derive(Constructor, Clone, Debug, PartialEq, Eq)]
+impl LookupSwitchInsn {
+	pub fn get(&self, case: i32) -> Option<LabelInsn> {
+		self.cases.get(&case).cloned()
+	}
+}
+
+impl Debug for LookupSwitchInsn {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		struct DebugCases<'u> {
+			tbl: &'u LookupSwitchInsn
+		}
+		impl <'u> Debug for DebugCases<'u> {
+			fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+				let mut map = f.debug_map();
+				map.entry(&"default", &self.tbl.default);
+				for (index, case) in self.tbl.cases.iter() {
+					map.entry(&index, case);
+				}
+				map.finish()
+			}
+		}
+		
+		f.debug_struct("LookupSwitchInsn")
+			.field("cases", &DebugCases{ tbl: &self })
+			.finish()
+	}
+}
+
+#[derive(Constructor, Clone, PartialEq, Eq)]
 pub struct TableSwitchInsn {
 	pub default: LabelInsn,
 	pub(crate) low: i32,
@@ -339,12 +367,36 @@ pub struct TableSwitchInsn {
 
 impl TableSwitchInsn {
 	#[allow(dead_code)]
-	fn get(&self, case: i32) -> Option<LabelInsn> {
+	pub fn get(&self, case: i32) -> Option<LabelInsn> {
 		if let Some(x) = self.cases.get((case - self.low) as usize) {
 			Some(x.clone())
 		} else {
 			None
 		}
+	}
+}
+
+impl Debug for TableSwitchInsn {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		struct DebugCases<'u> {
+			tbl: &'u TableSwitchInsn
+		}
+		impl <'u> Debug for DebugCases<'u> {
+			fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+				let mut map = f.debug_map();
+				map.entry(&"default", &self.tbl.default);
+				let mut index = 0;
+				for case in self.tbl.cases.iter() {
+					map.entry(&(index + self.tbl.low), case);
+					index += 1;
+				}
+				map.finish()
+			}
+		}
+		
+		f.debug_struct("TableSwitchInsn")
+			.field("cases", &DebugCases{ tbl: &self })
+			.finish()
 	}
 }
 

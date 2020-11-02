@@ -623,25 +623,25 @@ impl InsnParser {
 					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
 					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
 					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
-					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor))
+					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor, true))
 				}
 				InsnParser::INVOKESPECIAL => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
-					Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor))
+					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor, interface_method))
 				},
 				InsnParser::INVOKESTATIC => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
-					Insn::Invoke(InvokeInsn::new(InvokeType::Static, class, name, descriptor))
+					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					Insn::Invoke(InvokeInsn::new(InvokeType::Static, class, name, descriptor, interface_method))
 				},
 				InsnParser::INVOKEVIRTUAL => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor) = constant_pool.any_method(method_index)?;
-					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor))
+					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor, interface_method))
 				},
 				InsnParser::IOR => Insn::Or(OrInsn::new(PrimitiveType::Int)),
 				InsnParser::IREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Int)),

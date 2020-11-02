@@ -313,7 +313,8 @@ pub struct InvokeInsn {
 	pub kind: InvokeType,
 	pub class: String,
 	pub name: String,
-	pub descriptor: String
+	pub descriptor: String,
+	pub interface_method: bool
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

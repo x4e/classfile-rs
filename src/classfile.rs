@@ -1,8 +1,8 @@
-use std::io::{Write, Seek, Read};
+use std::io::{Write, Seek, Read, Cursor};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::Serializable;
 use crate::version::ClassVersion;
-use crate::constantpool::{ConstantPool};
+use crate::constantpool::{ConstantPool, ConstantPoolWriter};
 use crate::access::ClassAccessFlags;
 use crate::field::{Field, Fields};
 use crate::method::{Methods, Method};
@@ -61,9 +61,24 @@ impl ClassFile {
 	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
 		wtr.write_u32::<BigEndian>(self.magic)?;
 		self.version.write(wtr)?;
-		self.access_flags.write(wtr)?;
 		
-		let constant_pool = ConstantPool::new();
+		let mut constant_pool = ConstantPoolWriter::new();
+		
+		// we need to write fields/methods etc after the constant pool, however they rely upon
+		// mutable access to the constant pool. therefore we will write them to memory and then to
+		// the wtr parameter
+		let mut buff: Vec<u8> = Vec::with_capacity(2 + (self.fields.len() * 8) + (self.methods.len() * 8));
+		let mut cursor = Cursor::new(buff);
+		self.access_flags.write(&mut cursor)?;
+		
+		// this class
+		wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(self.this_class.clone())))?;
+		// super class
+		if let Some(x) = &self.super_class {
+			wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(x.clone())))?;
+		} else {
+			wtr.write_u16::<BigEndian>(0)?;
+		}
 		
 		Fields::write(wtr, &self.fields, &constant_pool)?;
 		Methods::write(wtr, &self.methods, &constant_pool)?;

@@ -6,6 +6,8 @@ use derive_more::Constructor;
 use crate::error::{Result, ParserError};
 use enum_display_derive::DisplayDebug;
 use std::fmt::{Debug, Formatter};
+use std::collections::HashSet;
+use linked_hash_map::LinkedHashMap;
 
 pub type CPIndex = u16;
 
@@ -74,21 +76,21 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn any_method(&self, index: CPIndex) -> Result<(String, String, String)> {
+	pub fn any_method(&self, index: CPIndex) -> Result<(String, String, String, bool)> {
 		match self.get(index)? {
 			ConstantType::Methodref(method) => {
 				let name_and_type = self.nameandtype(method.name_and_type_index)?;
 				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
 				let name = self.utf8(name_and_type.name_index)?.str.clone();
 				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
-				Ok((class, name, descriptor))
+				Ok((class, name, descriptor, false))
 			},
 			ConstantType::InterfaceMethodref(method) => {
 				let name_and_type = self.nameandtype(method.name_and_type_index)?;
 				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
 				let name = self.utf8(name_and_type.name_index)?.str.clone();
 				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
-				Ok((class, name, descriptor))
+				Ok((class, name, descriptor, true))
 			},
 			x => Err(ParserError::incomp_cp(
 				"AnyMethodRef",
@@ -277,11 +279,8 @@ impl Serializable for ConstantPool {
 				continue
 			}
 			let constant = ConstantType::parse(rdr, &cp)?;
-			match constant {
-				ConstantType::Double(..) | ConstantType::Long(..) => {
-					skip = true;
-				}
-				_ => {}
+			if constant.double_size() {
+				skip = true;
 			}
 			cp.set(i as CPIndex, Some(constant));
 		}
@@ -295,61 +294,64 @@ impl Serializable for ConstantPool {
 	}
 }
 
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ClassInfo {
 	pub name_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FieldRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InterfaceMethodRefInfo {
 	pub class_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StringInfo {
 	pub string_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IntegerInfo {
 	pub bytes: i32
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Hash)]
 pub struct FloatInfo {
 	pub bytes: f32
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LongInfo {
 	pub bytes: i64
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Hash)]
 pub struct DoubleInfo {
 	pub bytes: f64
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+
+impl Eq for DoubleInfo {}
+
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NameAndTypeInfo {
 	pub name_index: CPIndex,
 	pub descriptor_index: CPIndex
 }
-#[derive(Constructor, Clone, Debug, PartialEq)]
+#[derive(Constructor, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Utf8Info {
 	pub str: String
 }
 
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodHandleInfo {
 	pub reference: MethodHandleKind
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MethodHandleKind {
 	GetField(FieldRefInfo),
 	GetStatic(FieldRefInfo),
@@ -362,30 +364,30 @@ pub enum MethodHandleKind {
 }
 
 
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodTypeInfo {
 	pub descriptor_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DynamicInfo {
 	pub bootstrap_method_attr_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InvokeDynamicInfo {
 	pub bootstrap_method_attr_index: CPIndex,
 	pub name_and_type_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModuleInfo {
 	pub name_index: CPIndex
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq)]
+#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PackageInfo {
 	pub name_index: CPIndex
 }
 
-#[derive(Clone, PartialEq, DisplayDebug)]
+#[derive(Clone, PartialEq, Eq, Hash, DisplayDebug)]
 pub enum ConstantType {
 	Class (ClassInfo),
 	Fieldref (FieldRefInfo),
@@ -407,64 +409,82 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
+	const CONSTANT_Utf8: u8 = 1;
+	const CONSTANT_Integer: u8 = 3;
+	const CONSTANT_Float: u8 = 4;
+	const CONSTANT_Long: u8 = 5;
+	const CONSTANT_Double: u8 = 6;
+	const CONSTANT_Class: u8 = 7;
+	const CONSTANT_String: u8 = 8;
+	const CONSTANT_Fieldref: u8 = 9;
+	const CONSTANT_Methodref: u8 = 10;
+	const CONSTANT_InterfaceMethodref: u8 = 11;
+	const CONSTANT_NameAndType: u8 = 12;
+	const CONSTANT_MethodHandle: u8 = 15;
+	const CONSTANT_MethodType: u8 = 16;
+	const CONSTANT_Dynamic: u8 = 17;
+	const CONSTANT_InvokeDynamic: u8 = 18;
+	const CONSTANT_Module: u8 = 19;
+	const CONSTANT_Package: u8 = 20;
+	
 	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &ConstantPool) -> Result<Self> {
 		let tag = rdr.read_u8()?;
 		Ok(match tag {
-			7 => ConstantType::Class {
+			ConstantType::CONSTANT_Class => ConstantType::Class {
 				0: ClassInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			9 => ConstantType::Fieldref {
+			ConstantType::CONSTANT_Fieldref => ConstantType::Fieldref {
 				0: FieldRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			10 => ConstantType::Methodref {
+			ConstantType::CONSTANT_Methodref => ConstantType::Methodref {
 				0: MethodRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			11 => ConstantType::InterfaceMethodref {
+			ConstantType::CONSTANT_InterfaceMethodref => ConstantType::InterfaceMethodref {
 				0: InterfaceMethodRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			8 => ConstantType::String {
+			ConstantType::CONSTANT_String => ConstantType::String {
 				0: StringInfo {
 					string_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			3 => ConstantType::Integer {
+			ConstantType::CONSTANT_Integer => ConstantType::Integer {
 				0: IntegerInfo {
 					bytes: rdr.read_i32::<BigEndian>()?
 				},
 			},
-			4 => ConstantType::Float {
+			ConstantType::CONSTANT_Float => ConstantType::Float {
 				0: FloatInfo {
 					bytes: rdr.read_f32::<BigEndian>()?
 				},
 			},
-			5 => ConstantType::Long {
+			ConstantType::CONSTANT_Long => ConstantType::Long {
 				0: LongInfo {
 					bytes: rdr.read_i64::<BigEndian>()?
 				},
 			},
-			6 => ConstantType::Double {
+			ConstantType::CONSTANT_Double => ConstantType::Double {
 				0: DoubleInfo {
 					bytes: rdr.read_f64::<BigEndian>()?
 				},
 			},
-			12 => ConstantType::NameAndType {
+			ConstantType::CONSTANT_NameAndType => ConstantType::NameAndType {
 				0: NameAndTypeInfo {
 					name_index: rdr.read_u16::<BigEndian>()?,
 					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			1 => {
+			ConstantType::CONSTANT_Utf8 => {
 				let length = rdr.read_u16::<BigEndian>()? as usize;
 				let mut bytes: Vec<u8> = Vec::with_capacity(length);
 				for _ in 0..length {
@@ -512,7 +532,7 @@ impl ConstantType {
 					},
 				}
 			},
-			15 => {
+			ConstantType::CONSTANT_MethodHandle => {
 				let reference_kind = rdr.read_u8()?;
 				let reference_index = rdr.read_u16::<BigEndian>()? as usize;
 				let reference = constants.get(reference_index as CPIndex)?;
@@ -556,29 +576,29 @@ impl ConstantType {
 				};
 				ConstantType::MethodHandle(MethodHandleInfo::new(handle_kind))
 			},
-			16 => ConstantType::MethodType {
+			ConstantType::CONSTANT_MethodType => ConstantType::MethodType {
 				0: MethodTypeInfo {
 					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			17 => ConstantType::Dynamic {
+			ConstantType::CONSTANT_Dynamic => ConstantType::Dynamic {
 				0: DynamicInfo {
 					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			18 => ConstantType::InvokeDynamic {
+			ConstantType::CONSTANT_InvokeDynamic => ConstantType::InvokeDynamic {
 				0: InvokeDynamicInfo {
 					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			19 => ConstantType::Module {
+			ConstantType::CONSTANT_Module => ConstantType::Module {
 				0: ModuleInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			20 => ConstantType::Package {
+			ConstantType::CONSTANT_Package => ConstantType::Package {
 				0: PackageInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
@@ -595,5 +615,150 @@ impl ConstantType {
 			_ => return Err(ParserError::unimplemented("Constant Pool Writing"))
 		}
 		Ok(())
+	}
+	
+	pub fn double_size(&self) -> bool {
+		match self {
+			ConstantType::Double(..) | ConstantType::Long(..) => true,
+			_ => false
+		}
+	}
+}
+
+pub struct ConstantPoolWriter {
+	inner: LinkedHashMap<ConstantType, u16>,
+	index: u16
+}
+
+impl ConstantPoolWriter {
+	pub fn new() -> ConstantPoolWriter {
+		ConstantPoolWriter {
+			inner: LinkedHashMap::with_capacity(5),
+			index: 1
+		}
+	}
+	
+	pub fn put(&mut self, constant: ConstantType) -> CPIndex {
+		match self.inner.get(con) {
+			Some(x) => *x,
+			None => {
+				let this_index = self.index;
+				self.inner.insert(constant, this_index);
+				self.index += if constant.double_size() { 2	} else { 1 };
+				this_index
+			}
+		} as CPIndex
+	}
+	
+	pub fn len(&self) -> u16 {
+		self.index
+	}
+	
+	pub fn class(&mut self, name_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Class(ClassInfo {
+			name_index
+		}))
+	}
+	
+	pub fn fieldref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Fieldref(FieldRefInfo {
+			class_index,
+			name_and_type_index
+		}))
+	}
+	
+	pub fn methodref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Methodref(MethodRefInfo {
+			class_index,
+			name_and_type_index
+		}))
+	}
+	
+	pub fn interfacemethodref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::InterfaceMethodref(InterfaceMethodRefInfo {
+			class_index,
+			name_and_type_index
+		}))
+	}
+	
+	pub fn string(&mut self, string_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::String(StringInfo {
+			string_index
+		}))
+	}
+	
+	pub fn integer(&mut self, bytes: i32) -> CPIndex {
+		self.put(ConstantType::Integer(IntegerInfo {
+			bytes
+		}))
+	}
+	
+	pub fn float(&mut self, bytes: f32) -> CPIndex {
+		self.put(ConstantType::Float(FloatInfo {
+			bytes
+		}))
+	}
+	
+	pub fn long(&mut self, bytes: i64) -> CPIndex {
+		self.put(ConstantType::Long(LongInfo {
+			bytes
+		}))
+	}
+	
+	pub fn double(&mut self, bytes: f64) -> CPIndex {
+		self.put(ConstantType::Double(DoubleInfo {
+			bytes
+		}))
+	}
+	
+	pub fn nameandtype(&mut self, name_index: CPIndex, descriptor_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::NameAndType(NameAndTypeInfo {
+			name_index,
+			descriptor_index
+		}))
+	}
+	
+	pub fn utf8<T: Into<String>>(&mut self, str: T) -> CPIndex {
+		self.put(ConstantType::Utf8(Utf8Info {
+			str: str.into()
+		}))
+	}
+	
+	pub fn methodhandle(&mut self, reference: MethodHandleKind) -> CPIndex {
+		self.put(ConstantType::MethodHandle(MethodHandleInfo {
+			reference
+		}))
+	}
+	
+	pub fn methodtype(&mut self, descriptor_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::MethodType(MethodTypeInfo {
+			descriptor_index
+		}))
+	}
+	
+	pub fn dynamicinfo(&mut self, bootstrap_method_attr_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Dynamic(DynamicInfo {
+			bootstrap_method_attr_index,
+			name_and_type_index
+		}))
+	}
+	
+	pub fn invokedynamicinfo(&mut self, bootstrap_method_attr_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::InvokeDynamic(InvokeDynamicInfo {
+			bootstrap_method_attr_index,
+			name_and_type_index
+		}))
+	}
+	
+	pub fn module(&mut self, name_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Module(ModuleInfo {
+			name_index
+		}))
+	}
+	
+	pub fn package(&mut self, name_index: CPIndex) -> CPIndex {
+		self.put(ConstantType::Package(PackageInfo {
+			name_index
+		}))
 	}
 }

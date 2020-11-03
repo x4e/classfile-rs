@@ -1,14 +1,14 @@
-use crate::constantpool::{ConstantPool, ConstantType};
+use crate::constantpool::{ConstantPool, ConstantType, ConstantPoolWriter};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use std::io::{Seek, Write, Read};
+use std::io::{Write, Read};
 use crate::version::{MajorVersion, ClassVersion};
 use crate::code::CodeAttribute;
 use crate::error::Result;
 
 #[allow(non_snake_case)]
 pub mod Attributes {
-	use std::io::{Seek, Read, Write};
-	use crate::constantpool::{ConstantPool};
+	use std::io::{Read, Write};
+	use crate::constantpool::{ConstantPool, ConstantPoolWriter};
 	use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 	use crate::version::{ClassVersion};
 	use crate::attributes::{Attribute, AttributeSource};
@@ -22,7 +22,7 @@ pub mod Attributes {
 		Ok(attributes)
 	}
 	
-	pub fn write<W: Seek + Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &ConstantPool) -> crate::Result<()> {
+	pub fn write<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
 			attribute.write(wtr, constant_pool)?;
@@ -50,8 +50,8 @@ impl ConstantValueAttribute {
 		let index = buf.as_slice().read_u16::<BigEndian>()?;
 		let value = match constant_pool.get(index)? {
 			ConstantType::Long(x) => ConstantValue::Long(x.bytes),
-			ConstantType::Float(x) => ConstantValue::Float(x.bytes),
-			ConstantType::Double(x) => ConstantValue::Double(x.bytes),
+			ConstantType::Float(x) => ConstantValue::Float(x.bytes()),
+			ConstantType::Double(x) => ConstantValue::Double(x.bytes()),
 			ConstantType::Integer(x) => ConstantValue::Int(x.bytes),
 			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.string_index)?.str.clone()),
 			x => panic!("Invalid constant value type {:#?} at index {}", x, index)
@@ -61,7 +61,7 @@ impl ConstantValueAttribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(0)?; // write name
 		wtr.write_u32::<BigEndian>(2)?; // length
 		wtr.write_u16::<BigEndian>(0)?; // cp ref
@@ -83,7 +83,7 @@ impl SignatureAttribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(0)?; // write name
 		wtr.write_u32::<BigEndian>(2)?; // length
 		wtr.write_u16::<BigEndian>(0)?; // cp ref
@@ -109,7 +109,7 @@ impl ExceptionsAttribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
 		for _exception in self.exceptions.iter() {
 			// write exception
@@ -132,7 +132,7 @@ impl UnknownAttribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(0)?; // write name
 		wtr.write_u32::<BigEndian>(self.buf.len() as u32)?; // length
 		wtr.write_all(self.buf.as_slice())?;
@@ -187,7 +187,7 @@ impl Attribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		match self {
 			Attribute::ConstantValue(t) => t.write(wtr, constant_pool),
 			Attribute::Signature(t) => t.write(wtr, constant_pool),

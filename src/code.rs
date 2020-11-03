@@ -1,7 +1,7 @@
 use crate::attributes::{Attribute, AttributeSource, Attributes};
-use crate::constantpool::{ConstantPool, ConstantType, CPIndex};
+use crate::constantpool::{ConstantPool, ConstantType, CPIndex, ConstantPoolWriter};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Write};
 use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
@@ -44,7 +44,7 @@ impl CodeAttribute {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(0)?; // write name
 		wtr.write_u32::<BigEndian>(2)?; // length
 		wtr.write_u16::<BigEndian>(0)?; // cp ref
@@ -81,7 +81,7 @@ impl ExceptionHandler {
 		})
 	}
 	
-	pub fn write<T: Seek + Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.start_pc)?;
 		wtr.write_u16::<BigEndian>(self.end_pc)?;
 		wtr.write_u16::<BigEndian>(self.handler_pc)?;
@@ -957,8 +957,8 @@ impl InsnParser {
 		let ldc_type = match constant {
 			ConstantType::String(x) => LdcType::String(constant_pool.utf8(x.string_index)?.str.clone()),
 			ConstantType::Integer(x) => LdcType::Int(x.bytes),
-			ConstantType::Float(x) => LdcType::Float(x.bytes),
-			ConstantType::Double(x) => LdcType::Double(x.bytes),
+			ConstantType::Float(x) => LdcType::Float(x.bytes()),
+			ConstantType::Double(x) => LdcType::Double(x.bytes()),
 			ConstantType::Long(x) => LdcType::Long(x.bytes),
 			ConstantType::Class(x) => LdcType::Class(constant_pool.utf8(x.name_index)?.str.clone()),
 			ConstantType::MethodType(x) => LdcType::MethodType(constant_pool.utf8(x.descriptor_index)?.str.clone()),

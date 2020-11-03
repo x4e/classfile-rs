@@ -1,5 +1,5 @@
 use crate::Serializable;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Write};
 use std::cmp::{PartialOrd, Ordering};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::error::{Result, ParserError};
@@ -22,13 +22,13 @@ impl PartialOrd for ClassVersion {
 }
 
 impl Serializable for ClassVersion {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+	fn parse<R: Read>(rdr: &mut R) -> Result<Self> {
 		let minor = rdr.read_u16::<BigEndian>()?;
 		let major = rdr.read_u16::<BigEndian>()?;
 		Ok(ClassVersion::new(major.try_into()?, minor))
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+	fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.minor)?;
 		wtr.write_u16::<BigEndian>(self.major.into())?;
 		Ok(())

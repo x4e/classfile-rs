@@ -1,13 +1,13 @@
 use crate::Serializable;
-use std::io::{Read, Write, Seek};
+use std::io::{Read, Write};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::Borrow;
 use derive_more::Constructor;
 use crate::error::{Result, ParserError};
 use enum_display_derive::DisplayDebug;
 use std::fmt::{Debug, Formatter};
-use std::collections::HashSet;
 use linked_hash_map::LinkedHashMap;
+use crate::utils::{CustomFloat, CustomDouble};
 
 pub type CPIndex = u16;
 
@@ -267,7 +267,7 @@ impl ConstantPool {
 }
 
 impl Serializable for ConstantPool {
-	fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+	fn parse<R: Read>(rdr: &mut R) -> Result<Self> {
 		let size = rdr.read_u16::<BigEndian>()? as usize;
 		let mut cp = ConstantPool {
 			inner: vec![None; size]
@@ -288,7 +288,7 @@ impl Serializable for ConstantPool {
 		Ok(cp)
 	}
 	
-	fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+	fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.inner.len() as u16)?;
 		Ok(())
 	}
@@ -321,20 +321,38 @@ pub struct StringInfo {
 pub struct IntegerInfo {
 	pub bytes: i32
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FloatInfo {
-	pub bytes: f32
+	bytes: CustomFloat
+}
+impl FloatInfo {
+	pub fn new(bytes: f32) -> Self {
+		FloatInfo {
+			bytes: CustomFloat::new(bytes)
+		}
+	}
+	pub fn bytes(&self) -> f32 {
+		self.bytes.into()
+	}
 }
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LongInfo {
 	pub bytes: i64
 }
-#[derive(Constructor, Copy, Clone, Debug, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DoubleInfo {
-	pub bytes: f64
+	bytes: CustomDouble
 }
-
-impl Eq for DoubleInfo {}
+impl DoubleInfo {
+	pub fn new(bytes: f64) -> Self {
+		DoubleInfo {
+			bytes: CustomDouble::new(bytes)
+		}
+	}
+	pub fn bytes(&self) -> f64 {
+		self.bytes.into()
+	}
+}
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NameAndTypeInfo {
@@ -408,6 +426,7 @@ pub enum ConstantType {
 	Package (PackageInfo)
 }
 
+#[allow(non_upper_case_globals)]
 impl ConstantType {
 	const CONSTANT_Utf8: u8 = 1;
 	const CONSTANT_Integer: u8 = 3;
@@ -427,7 +446,7 @@ impl ConstantType {
 	const CONSTANT_Module: u8 = 19;
 	const CONSTANT_Package: u8 = 20;
 	
-	pub fn parse<R: Seek + Read>(rdr: &mut R, constants: &ConstantPool) -> Result<Self> {
+	pub fn parse<R: Read>(rdr: &mut R, constants: &ConstantPool) -> Result<Self> {
 		let tag = rdr.read_u8()?;
 		Ok(match tag {
 			ConstantType::CONSTANT_Class => ConstantType::Class {
@@ -464,9 +483,7 @@ impl ConstantType {
 				},
 			},
 			ConstantType::CONSTANT_Float => ConstantType::Float {
-				0: FloatInfo {
-					bytes: rdr.read_f32::<BigEndian>()?
-				},
+				0: FloatInfo::new(rdr.read_f32::<BigEndian>()?),
 			},
 			ConstantType::CONSTANT_Long => ConstantType::Long {
 				0: LongInfo {
@@ -474,9 +491,7 @@ impl ConstantType {
 				},
 			},
 			ConstantType::CONSTANT_Double => ConstantType::Double {
-				0: DoubleInfo {
-					bytes: rdr.read_f64::<BigEndian>()?
-				},
+				0: DoubleInfo::new(rdr.read_f64::<BigEndian>()?),
 			},
 			ConstantType::CONSTANT_NameAndType => ConstantType::NameAndType {
 				0: NameAndTypeInfo {
@@ -607,7 +622,7 @@ impl ConstantType {
 		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+	pub fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
 		match self {
 			ConstantType::Class { .. } => {
 				wtr.write_u8(7)?
@@ -639,15 +654,15 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn put(&mut self, constant: ConstantType) -> CPIndex {
-		match self.inner.get(con) {
+		match self.inner.get(&constant) {
 			Some(x) => *x,
 			None => {
 				let this_index = self.index;
-				self.inner.insert(constant, this_index);
 				self.index += if constant.double_size() { 2	} else { 1 };
+				self.inner.insert(constant, this_index);
 				this_index
 			}
-		} as CPIndex
+		}
 	}
 	
 	pub fn len(&self) -> u16 {
@@ -694,9 +709,7 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn float(&mut self, bytes: f32) -> CPIndex {
-		self.put(ConstantType::Float(FloatInfo {
-			bytes
-		}))
+		self.put(ConstantType::Float(FloatInfo::new(bytes)))
 	}
 	
 	pub fn long(&mut self, bytes: i64) -> CPIndex {
@@ -706,9 +719,7 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn double(&mut self, bytes: f64) -> CPIndex {
-		self.put(ConstantType::Double(DoubleInfo {
-			bytes
-		}))
+		self.put(ConstantType::Double(DoubleInfo::new(bytes)))
 	}
 	
 	pub fn nameandtype(&mut self, name_index: CPIndex, descriptor_index: CPIndex) -> CPIndex {

@@ -1,4 +1,4 @@
-use std::io::{Write, Seek, Read, Cursor};
+use std::io::{Write, Read, Cursor};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::Serializable;
 use crate::version::ClassVersion;
@@ -23,7 +23,7 @@ pub struct ClassFile {
 }
 
 impl ClassFile {
-	pub fn parse<R: Seek + Read>(rdr: &mut R) -> Result<Self> {
+	pub fn parse<R: Read>(rdr: &mut R) -> Result<Self> {
 		let magic = rdr.read_u32::<BigEndian>()?;
 		if magic != 0xCAFEBABE {
 			return Err(ParserError::unrecognised("header", magic.to_string()));
@@ -58,7 +58,7 @@ impl ClassFile {
 		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W) -> Result<()> {
+	pub fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
 		wtr.write_u32::<BigEndian>(self.magic)?;
 		self.version.write(wtr)?;
 		
@@ -67,21 +67,29 @@ impl ClassFile {
 		// we need to write fields/methods etc after the constant pool, however they rely upon
 		// mutable access to the constant pool. therefore we will write them to memory and then to
 		// the wtr parameter
-		let mut buff: Vec<u8> = Vec::with_capacity(2 + (self.fields.len() * 8) + (self.methods.len() * 8));
+		let buff: Vec<u8> = Vec::with_capacity(2 + (self.fields.len() * 8) + (self.methods.len() * 8));
 		let mut cursor = Cursor::new(buff);
 		self.access_flags.write(&mut cursor)?;
 		
 		// this class
-		wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(self.this_class.clone())))?;
+		let utf = constant_pool.utf8(self.this_class.clone());
+		wtr.write_u16::<BigEndian>(constant_pool.class(utf))?;
 		// super class
 		if let Some(x) = &self.super_class {
-			wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(x.clone())))?;
+			let utf = constant_pool.utf8(x.clone());
+			wtr.write_u16::<BigEndian>(constant_pool.class(utf))?;
 		} else {
 			wtr.write_u16::<BigEndian>(0)?;
 		}
+		// interfaces
+		wtr.write_u16::<BigEndian>(self.interfaces.len() as u16)?;
+		for interface in self.interfaces.iter() {
+			let utf = constant_pool.utf8(interface.clone());
+			wtr.write_u16::<BigEndian>(constant_pool.class(utf))?;
+		}
 		
-		Fields::write(wtr, &self.fields, &constant_pool)?;
-		Methods::write(wtr, &self.methods, &constant_pool)?;
+		Fields::write(&mut cursor, &self.fields, &mut constant_pool)?;
+		Methods::write(&mut cursor, &self.methods, &mut constant_pool)?;
 		Ok(())
 	}
 }

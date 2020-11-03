@@ -1,8 +1,8 @@
 use crate::access::MethodAccessFlags;
 use crate::attributes::{Attribute, Attributes, AttributeSource};
 use crate::version::ClassVersion;
-use crate::constantpool::ConstantPool;
-use std::io::{Seek, Read, Write};
+use crate::constantpool::{ConstantPool, ConstantPoolWriter};
+use std::io::{Read, Write};
 use crate::Serializable;
 use byteorder::{BigEndian, ReadBytesExt};
 use crate::error::Result;
@@ -11,13 +11,13 @@ use crate::insnlist::InsnList;
 
 #[allow(non_snake_case)]
 pub mod Methods {
-	use std::io::{Seek, Read, Write};
+	use std::io::{Read, Write};
 	use crate::method::Method;
 	use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 	use crate::version::ClassVersion;
-	use crate::constantpool::ConstantPool;
+	use crate::constantpool::{ConstantPool, ConstantPoolWriter};
 	
-	pub fn parse<T: Seek + Read>(rdr: &mut T, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Method>> {
+	pub fn parse<T: Read>(rdr: &mut T, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Method>> {
 		let num_fields = rdr.read_u16::<BigEndian>()? as usize;
 		let mut fields: Vec<Method> = Vec::with_capacity(num_fields);
 		for _ in 0..num_fields {
@@ -26,7 +26,7 @@ pub mod Methods {
 		Ok(fields)
 	}
 	
-	pub fn write<T: Seek + Write>(wtr: &mut T, fields: &Vec<Method>, constant_pool: &ConstantPool) -> crate::Result<()> {
+	pub fn write<T: Write>(wtr: &mut T, fields: &Vec<Method>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(fields.len() as u16)?;
 		for field in fields.iter() {
 			field.write(wtr, constant_pool)?;
@@ -47,7 +47,7 @@ pub struct Method {
 }
 
 impl Method {
-	pub fn parse<R: Seek + Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Self> {
+	pub fn parse<R: Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Self> {
 		let access_flags = MethodAccessFlags::parse(rdr)?;
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
@@ -90,7 +90,7 @@ impl Method {
 		})
 	}
 	
-	pub fn write<W: Seek + Write>(&self, wtr: &mut W, constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		self.access_flags.write(wtr)?;
 		Attributes::write(wtr, &self.attributes, constant_pool)?;
 		Ok(())

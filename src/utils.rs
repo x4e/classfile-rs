@@ -1,5 +1,4 @@
 use std::io::Read;
-use std::convert::TryFrom;
 
 pub fn mut_retain<T, F>(this: &mut Vec<T>, mut f: F)
 	where

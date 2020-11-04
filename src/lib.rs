@@ -59,7 +59,7 @@ mod tests {
 				}
 			}
 			Ok(())
-		})?;/*
+		})?;
 		walk("classes/testing/", &|entry| {
 			let path = entry.path();
 			if path.is_file() {
@@ -95,7 +95,7 @@ mod tests {
 				}
 			}
 			Ok(())
-		})?;*/
+		})?;
 		Ok(())
 	}
 }

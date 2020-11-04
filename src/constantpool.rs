@@ -491,7 +491,7 @@ impl ConstantType {
 				};
 				
 				let str = String::from_utf8_lossy(&utf);
-				let str = String::from((&*str));
+				let str = String::from(&*str);
 				ConstantType::Utf8 ( Utf8Info { str } )
 			},
 			ConstantType::CONSTANT_MethodHandle => {

@@ -318,10 +318,6 @@ impl InsnParser {
 			let insn = match opcode {
 				InsnParser::AALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Reference(None))),
 				InsnParser::AASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Reference(None))),
-				InsnParser::ASTORE_0 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 0)),
-				InsnParser::ASTORE_1 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 1)),
-				InsnParser::ASTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 2)),
-				InsnParser::ASTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 3)),
 				InsnParser::ACONST_NULL => Insn::Ldc(LdcInsn::new(LdcType::Null)),
 				InsnParser::ALOAD => {
 					let index = rdr.read_u8()?;
@@ -344,6 +340,7 @@ impl InsnParser {
 					pc += 1;
 					Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, index as u16))
 				},
+				InsnParser::ASTORE_0 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 0)),
 				InsnParser::ASTORE_1 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 1)),
 				InsnParser::ASTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 2)),
 				InsnParser::ASTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 3)),

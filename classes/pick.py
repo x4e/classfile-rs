@@ -5,7 +5,7 @@ import os
 dir = "benchmarking"
 
 
-step = 5000 # 500 bytes
+step = 7500 # 500 bytes
 sizes = set()
 
 for file in os.scandir(dir):

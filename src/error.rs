@@ -2,6 +2,8 @@ use thiserror::Error;
 use std::{io, result};
 use std::fmt::{Debug};
 use crate::constantpool::ConstantType;
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 
 #[derive(Error, Debug)]
 pub enum ParserError {
@@ -32,6 +34,8 @@ pub enum ParserError {
     Unimplemented(&'static str),
 	#[error("Out of bounds jump index {0}")]
 	OutOfBoundsJumpIndex(i32),
+	#[error("Invalid Utf8 {0}")]
+	InvalidUtf8(Utf8Error),
 	#[error("{0}")]
 	Other(String)
 }
@@ -91,6 +95,10 @@ impl ParserError {
 		ParserError::OutOfBoundsJumpIndex(index).check_panic()
 	}
 	
+	pub fn invalid_utf8(err: Utf8Error) -> Self {
+		ParserError::InvalidUtf8(err).check_panic()
+	}
+	
 	pub fn other<T>(name: T) -> Self
 		where T: Into<String> {
 		ParserError::Other(name.into()).check_panic()
@@ -100,6 +108,12 @@ impl ParserError {
 impl From<io::Error> for ParserError {
 	fn from(inner: io::Error) -> Self {
 		ParserError::io(inner)
+	}
+}
+
+impl From<std::string::FromUtf8Error> for ParserError {
+	fn from(err: FromUtf8Error) -> Self {
+		ParserError::invalid_utf8(err.utf8_error())
 	}
 }
 

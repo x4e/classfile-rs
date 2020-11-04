@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::convert::TryFrom;
 
 pub fn mut_retain<T, F>(this: &mut Vec<T>, mut f: F)
 	where
@@ -24,9 +25,10 @@ pub fn mut_retain<T, F>(this: &mut Vec<T>, mut f: F)
 
 pub trait ReadUtils: Read {
 	#[inline]
-	fn read_nbytes(&mut self, nbytes: usize) -> std::io::Result<()> {
-		let mut buf = [0; 8];
-		self.read_exact(&mut buf[..nbytes])
+	fn read_nbytes(&mut self, nbytes: usize) -> std::io::Result<Vec<u8>> {
+		let mut buf = vec![0u8; nbytes];
+		self.read_exact(&mut buf)?;
+		Ok(buf)
 	}
 }
 impl<W: Read + ?Sized> ReadUtils for W {}
@@ -81,5 +83,4 @@ impl From<f64> for CustomDouble {
 		CustomDouble::new(x)
 	}
 }
-
 

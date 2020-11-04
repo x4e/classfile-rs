@@ -20,6 +20,7 @@ derive_more = { version = "0.99.11", default-features = false, features = ["cons
 thiserror = "1.0.21"
 enum-display-derive = { git = "https://github.com/bytechef/enum-display-derive" }
 linked-hash-map = "0.5.3"
+mutf8 = "0.4.1"
 
 [dev-dependencies]
 criterion = "0.3.3"

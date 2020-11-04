@@ -318,6 +318,10 @@ impl InsnParser {
 			let insn = match opcode {
 				InsnParser::AALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Reference(None))),
 				InsnParser::AASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Reference(None))),
+				InsnParser::ASTORE_0 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 0)),
+				InsnParser::ASTORE_1 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 1)),
+				InsnParser::ASTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 2)),
+				InsnParser::ASTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 3)),
 				InsnParser::ACONST_NULL => Insn::Ldc(LdcInsn::new(LdcType::Null)),
 				InsnParser::ALOAD => {
 					let index = rdr.read_u8()?;
@@ -628,19 +632,37 @@ impl InsnParser {
 				InsnParser::INVOKESPECIAL => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					
+					let (method, interface_method) = constant_pool.any_method(method_index)?;
+					let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
+					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
+					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
+					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
+					
 					Insn::Invoke(InvokeInsn::new(InvokeType::Special, class, name, descriptor, interface_method))
 				},
 				InsnParser::INVOKESTATIC => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					
+					let (method, interface_method) = constant_pool.any_method(method_index)?;
+					let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
+					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
+					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
+					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
+					
 					Insn::Invoke(InvokeInsn::new(InvokeType::Static, class, name, descriptor, interface_method))
 				},
 				InsnParser::INVOKEVIRTUAL => {
 					let method_index = rdr.read_u16::<BigEndian>()?;
 					pc += 2;
-					let (class, name, descriptor, interface_method) = constant_pool.any_method(method_index)?;
+					
+					let (method, interface_method) = constant_pool.any_method(method_index)?;
+					let name_and_type = constant_pool.nameandtype(method.name_and_type_index)?;
+					let class = constant_pool.utf8(constant_pool.class(method.class_index)?.name_index)?.str.clone();
+					let name = constant_pool.utf8(name_and_type.name_index)?.str.clone();
+					let descriptor = constant_pool.utf8(name_and_type.descriptor_index)?.str.clone();
+					
 					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor, interface_method))
 				},
 				InsnParser::IOR => Insn::Or(OrInsn::new(PrimitiveType::Int)),
@@ -667,6 +689,7 @@ impl InsnParser {
 				InsnParser::L2I => Insn::Convert(ConvertInsn::new(PrimitiveType::Long, PrimitiveType::Int)),
 				InsnParser::LADD => Insn::Add(AddInsn::new(PrimitiveType::Long)),
 				InsnParser::LALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Long))),
+				InsnParser::LAND => Insn::And(AndInsn::new(PrimitiveType::Long)),
 				InsnParser::LASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Long))),
 				InsnParser::LCMP => Insn::Compare(CompareInsn::new(PrimitiveType::Long, false)),
 				InsnParser::LCONST_0 => Insn::Ldc(LdcInsn::new(LdcType::Long(0))),
@@ -720,6 +743,7 @@ impl InsnParser {
 						cases
 					})
 				}
+				InsnParser::LOR => Insn::Or(OrInsn::new(PrimitiveType::Long)),
 				InsnParser::LREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Long)),
 				InsnParser::LRETURN => Insn::Return(ReturnInsn::new(ReturnType::Long)),
 				InsnParser::LSHL => Insn::ShiftLeft(ShiftLeftInsn::new(OpType::Long)),

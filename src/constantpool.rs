@@ -1,13 +1,13 @@
 use crate::Serializable;
 use std::io::{Read, Write};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use std::borrow::Borrow;
+use std::borrow::{Cow};
 use derive_more::Constructor;
 use crate::error::{Result, ParserError};
 use enum_display_derive::DisplayDebug;
 use std::fmt::{Debug, Formatter};
 use linked_hash_map::LinkedHashMap;
-use crate::utils::{CustomFloat, CustomDouble};
+use crate::utils::{CustomFloat, CustomDouble, ReadUtils};
 
 pub type CPIndex = u16;
 
@@ -76,22 +76,10 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn any_method(&self, index: CPIndex) -> Result<(String, String, String, bool)> {
+	pub fn any_method(&self, index: CPIndex) -> Result<(&MethodRefInfo, bool)> {
 		match self.get(index)? {
-			ConstantType::Methodref(method) => {
-				let name_and_type = self.nameandtype(method.name_and_type_index)?;
-				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
-				let name = self.utf8(name_and_type.name_index)?.str.clone();
-				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
-				Ok((class, name, descriptor, false))
-			},
-			ConstantType::InterfaceMethodref(method) => {
-				let name_and_type = self.nameandtype(method.name_and_type_index)?;
-				let class = self.utf8(self.class(method.class_index)?.name_index)?.str.clone();
-				let name = self.utf8(name_and_type.name_index)?.str.clone();
-				let descriptor = self.utf8(name_and_type.descriptor_index)?.str.clone();
-				Ok((class, name, descriptor, true))
-			},
+			ConstantType::Methodref(method) => Ok((method, false)),
+			ConstantType::InterfaceMethodref(method) => Ok((method, true)),
 			x => Err(ParserError::incomp_cp(
 				"AnyMethodRef",
 				x,
@@ -111,7 +99,7 @@ impl ConstantPool {
 		}
 	}
 	
-	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&InterfaceMethodRefInfo> {
+	pub fn interfacemethodref(&self, index: CPIndex) -> Result<&MethodRefInfo> {
 		match self.get(index)? {
 			ConstantType::InterfaceMethodref(t) => Ok(t),
 			x => Err(ParserError::incomp_cp(
@@ -309,11 +297,6 @@ pub struct MethodRefInfo {
 	pub name_and_type_index: CPIndex
 }
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct InterfaceMethodRefInfo {
-	pub class_index: CPIndex,
-	pub name_and_type_index: CPIndex
-}
-#[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StringInfo {
 	pub string_index: CPIndex
 }
@@ -377,8 +360,8 @@ pub enum MethodHandleKind {
 	PutStatic(FieldRefInfo),
 	InvokeVirtual(MethodRefInfo),
 	NewInvokeSpecial(MethodRefInfo),
-	InvokeStatic((Option<MethodRefInfo>, Option<InterfaceMethodRefInfo>)),
-	InvokeSpecial((Option<MethodRefInfo>, Option<InterfaceMethodRefInfo>)),
+	InvokeStatic(MethodRefInfo),
+	InvokeSpecial(MethodRefInfo),
 }
 
 
@@ -410,7 +393,7 @@ pub enum ConstantType {
 	Class (ClassInfo),
 	Fieldref (FieldRefInfo),
 	Methodref (MethodRefInfo),
-	InterfaceMethodref (InterfaceMethodRefInfo),
+	InterfaceMethodref (MethodRefInfo),
 	String (StringInfo),
 	Integer (IntegerInfo),
 	Float (FloatInfo),
@@ -460,92 +443,56 @@ impl ConstantType {
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
 			},
-			ConstantType::CONSTANT_Methodref => ConstantType::Methodref {
-				0: MethodRefInfo {
+			ConstantType::CONSTANT_Methodref => ConstantType::Methodref (
+				MethodRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_InterfaceMethodref => ConstantType::InterfaceMethodref {
-				0: InterfaceMethodRefInfo {
+			),
+			ConstantType::CONSTANT_InterfaceMethodref => ConstantType::InterfaceMethodref (
+				MethodRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_String => ConstantType::String {
-				0: StringInfo {
+			),
+			ConstantType::CONSTANT_String => ConstantType::String (
+				StringInfo {
 					string_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Integer => ConstantType::Integer {
-				0: IntegerInfo {
+			),
+			ConstantType::CONSTANT_Integer => ConstantType::Integer (
+				IntegerInfo {
 					bytes: rdr.read_i32::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Float => ConstantType::Float {
-				0: FloatInfo::new(rdr.read_f32::<BigEndian>()?),
-			},
-			ConstantType::CONSTANT_Long => ConstantType::Long {
-				0: LongInfo {
+			),
+			ConstantType::CONSTANT_Float => ConstantType::Float (
+				FloatInfo::new(rdr.read_f32::<BigEndian>()?),
+			),
+			ConstantType::CONSTANT_Long => ConstantType::Long (
+				LongInfo {
 					bytes: rdr.read_i64::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Double => ConstantType::Double {
-				0: DoubleInfo::new(rdr.read_f64::<BigEndian>()?),
-			},
-			ConstantType::CONSTANT_NameAndType => ConstantType::NameAndType {
-				0: NameAndTypeInfo {
+			),
+			ConstantType::CONSTANT_Double => ConstantType::Double (
+				DoubleInfo::new(rdr.read_f64::<BigEndian>()?),
+			),
+			ConstantType::CONSTANT_NameAndType => ConstantType::NameAndType (
+				NameAndTypeInfo {
 					name_index: rdr.read_u16::<BigEndian>()?,
 					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
+			),
 			ConstantType::CONSTANT_Utf8 => {
 				let length = rdr.read_u16::<BigEndian>()? as usize;
-				let mut bytes: Vec<u8> = Vec::with_capacity(length);
-				for _ in 0..length {
-					bytes.push(rdr.read_u8()?);
-				}
-				let mut str = String::with_capacity(length);
+				let bytes = rdr.read_nbytes(length)?;
+				let utf = match mutf8::mutf8_to_utf8(bytes.as_slice()) {
+					Cow::Borrowed(_data) => bytes.into(),
+					Cow::Owned(data) => data.into_boxed_slice(),
+				};
 				
-				let mut valid = true;
-				let mut i = 0usize;
-				while i < length {
-					let c1 = bytes[i];
-					i += 1;
-					if c1 & 0x80 == 0 {
-						str.push(c1 as char);
-					} else if c1 & 0xE0 == 0xC0 {
-						let c2 = rdr.read_u8()?;
-						i += 1;
-						if c2 & 0xC0 == 0x80 {
-							str.push((((c1 & 0x1F) << 6) + (c2 & 0x3F)) as char);
-						} else {
-							valid = false;
-							break;
-						}
-					} else if c1 & 0xF0 == 0xE0 {
-						let c2 = bytes[i];
-						i += 1;
-						let c3 = bytes[i];
-						i += 1;
-						if c2 & 0xC0 == 0x80 && c3 & 0xC0 == 0x80 {
-							#[allow(arithmetic_overflow)]
-							str.push((((c1 & 0xF) << 12) + ((c2 & 0x3F) << 6) + (c3 & 0x3F)) as char)
-						} else {
-							valid = false;
-							break;
-						}
-					}
-				}
-				if !valid {
-					str = String::from_utf8_lossy(bytes.borrow()).into_owned();//String::from(String::from_utf8_lossy(bytes.borrow()).borrow());
-				}
-				
-				ConstantType::Utf8 {
-					0: Utf8Info {
-						str
-					},
-				}
+				let str = String::from_utf8_lossy(&utf);
+				let str = String::from((&*str));
+				ConstantType::Utf8 ( Utf8Info { str } )
 			},
 			ConstantType::CONSTANT_MethodHandle => {
 				let reference_kind = rdr.read_u8()?;
@@ -581,6 +528,13 @@ impl ConstantType {
 						}
 					),
 					5 => MethodHandleKind::InvokeVirtual(
+						if let ConstantType::Methodref(x) = reference {
+							x.clone()
+						} else {
+							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
+						}
+					),
+					6 => MethodHandleKind::InvokeStatic(
 						if let ConstantType::Methodref(x) = reference {
 							x.clone()
 						} else {
@@ -690,7 +644,7 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn interfacemethodref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::InterfaceMethodref(InterfaceMethodRefInfo {
+		self.put(ConstantType::InterfaceMethodref(MethodRefInfo {
 			class_index,
 			name_and_type_index
 		}))

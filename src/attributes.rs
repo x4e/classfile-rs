@@ -125,6 +125,27 @@ pub struct UnknownAttribute {
 	pub buf: Vec<u8>
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceFileAttribute {
+	pub source_file: String
+}
+
+impl SourceFileAttribute {
+	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
+		let index = buf.as_slice().read_u16::<BigEndian>()?;
+		let source_file = constant_pool.utf8(index)?.str.clone();
+		Ok(SourceFileAttribute {
+			source_file
+		})
+	}
+	
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(0)?; // write name
+		wtr.write_u16::<BigEndian>(0)?; // write source file
+		Ok(())
+	}
+}
+
 impl UnknownAttribute {
 	pub fn parse(name: String, buf: Vec<u8>) -> Result<Self> {
 		Ok(UnknownAttribute {
@@ -146,6 +167,7 @@ pub enum Attribute {
 	Signature(SignatureAttribute),
 	Code(CodeAttribute),
 	Exceptions(ExceptionsAttribute),
+	SourceFile(SourceFileAttribute),
 	Unknown(UnknownAttribute)
 }
 
@@ -159,7 +181,11 @@ impl Attribute {
 		
 		Ok(match source {
 			AttributeSource::Class => {
-				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
+				if str == "SourceFile" {
+					Attribute::SourceFile(SourceFileAttribute::parse(constant_pool, buf)?)
+				} else {
+					Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
+				}
 			},
 			AttributeSource::Field => {
 				if str == "ConstantValue" {
@@ -193,6 +219,7 @@ impl Attribute {
 			Attribute::Signature(t) => t.write(wtr, constant_pool),
 			Attribute::Code(t) => t.write(wtr, constant_pool),
 			Attribute::Exceptions(t) => t.write(wtr, constant_pool),
+			Attribute::SourceFile(t) => t.write(wtr, constant_pool),
 			Attribute::Unknown(t) => t.write(wtr, constant_pool)
 		}
 	}

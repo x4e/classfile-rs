@@ -7,6 +7,7 @@ use crate::access::ClassAccessFlags;
 use crate::field::{Field, Fields};
 use crate::method::{Methods, Method};
 use crate::error::{Result, ParserError};
+use crate::attributes::{Attribute, Attributes, AttributeSource};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassFile {
@@ -19,7 +20,8 @@ pub struct ClassFile {
 	super_class: Option<String>,
 	interfaces: Vec<String>,
 	fields: Vec<Field>,
-	methods: Vec<Method>
+	methods: Vec<Method>,
+	attributes: Vec<Attribute>
 }
 
 impl ClassFile {
@@ -45,6 +47,7 @@ impl ClassFile {
 		
 		let fields = Fields::parse(rdr, &version, &constant_pool)?;
 		let methods = Methods::parse(rdr, &version, &constant_pool)?;
+		let attributes = Attributes::parse(rdr, AttributeSource::Class, &version, &constant_pool)?;
 		
 		Ok(ClassFile {
 			magic,
@@ -54,7 +57,8 @@ impl ClassFile {
 			super_class,
 			interfaces,
 			fields,
-			methods
+			methods,
+			attributes
 		})
 	}
 	

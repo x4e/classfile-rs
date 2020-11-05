@@ -1,4 +1,5 @@
 extern crate derive_more;
+extern crate bitflags;
 use std::io::{Read, Write};
 use error::Result;
 
@@ -23,8 +24,8 @@ pub trait Serializable : Sized {
 
 #[cfg(test)]
 mod tests {
-	use std::fs::{self, File, DirEntry};
-	use std::io::BufReader;
+	use std::fs::{self, File, DirEntry, OpenOptions};
+	use std::io::{BufReader, BufWriter};
 	use std::process::Command;
 	use crate::classfile::ClassFile;
 	use crate::error::Result;
@@ -36,8 +37,16 @@ mod tests {
 		ClassFile::parse(&mut reader)
 	}
 	
-    fn print_read(dir: &str) {
-		println!("{:#x?}", read(dir));
+	fn write(class: ClassFile, dir: &String) -> Result<()> {
+		let f = OpenOptions::new().write(true).open(dir).unwrap();
+		let mut writer = BufWriter::new(f);
+		class.write(&mut writer)
+	}
+	
+    fn print_read(dir: &String) -> Result<ClassFile> {
+	    let class = read(dir)?;
+		println!("{:#x?}", class);
+	    Ok(class)
     }
 	
 	fn walk(dir: &str, op: &dyn Fn(DirEntry) -> Result<()>) -> Result<()> {
@@ -91,7 +100,9 @@ mod tests {
 			if path.is_file() {
 				let extension = path.extension().unwrap().to_str().unwrap();
 				if extension == "class" {
-					print_read(path.into_os_string().to_str().unwrap());
+					let dir = path.into_os_string().into_string().unwrap();
+					let class = print_read(&dir).unwrap();
+					write(class, &dir)?;
 				}
 			}
 			Ok(())

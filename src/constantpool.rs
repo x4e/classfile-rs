@@ -596,7 +596,7 @@ impl ConstantType {
 
 pub struct ConstantPoolWriter {
 	inner: LinkedHashMap<ConstantType, u16>,
-	index: u16
+	index: CPIndex
 }
 
 impl ConstantPoolWriter {
@@ -725,5 +725,14 @@ impl ConstantPoolWriter {
 		self.put(ConstantType::Package(PackageInfo {
 			name_index
 		}))
+	}
+	
+	pub fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
+		wtr.write_u16::<BigEndian>(self.index as u16)?;
+		for (constant, _index) in self.inner.iter() {
+			constant.write(wtr)?;
+		}
+		
+		Ok(())
 	}
 }

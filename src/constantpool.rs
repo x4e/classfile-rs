@@ -266,7 +266,7 @@ impl Serializable for ConstantPool {
 				skip = false;
 				continue
 			}
-			let constant = ConstantType::parse(rdr, &cp)?;
+			let constant = ConstantType::parse(rdr)?;
 			if constant.double_size() {
 				skip = true;
 			}
@@ -298,7 +298,7 @@ pub struct MethodRefInfo {
 }
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StringInfo {
-	pub string_index: CPIndex
+	pub utf_index: CPIndex
 }
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IntegerInfo {
@@ -349,19 +349,34 @@ pub struct Utf8Info {
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodHandleInfo {
-	pub reference: MethodHandleKind
+	pub kind: MethodHandleKind,
+	pub reference: CPIndex
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MethodHandleKind {
-	GetField(FieldRefInfo),
-	GetStatic(FieldRefInfo),
-	PutField(FieldRefInfo),
-	PutStatic(FieldRefInfo),
-	InvokeVirtual(MethodRefInfo),
-	NewInvokeSpecial(MethodRefInfo),
-	InvokeStatic(MethodRefInfo),
-	InvokeSpecial(MethodRefInfo),
+	GetField,
+	GetStatic,
+	PutField,
+	PutStatic,
+	InvokeVirtual,
+	InvokeStatic,
+	InvokeSpecial,
+	NewInvokeSpecial,
+	InvokeInterface
+}
+
+#[allow(non_upper_case_globals)]
+impl MethodHandleKind {
+	const REF_getField: u8 = 1;
+	const REF_getStatic: u8 = 2;
+	const REF_putField: u8 = 3;
+	const REF_putStatic: u8 = 4;
+	const REF_invokeVirtual: u8 = 5;
+	const REF_invokeStatic: u8 = 6;
+	const REF_invokeSpecial: u8 = 7;
+	const REF_newInvokeSpecial: u8 = 8;
+	const REF_invokeInterface: u8 = 9;
 }
 
 
@@ -429,20 +444,20 @@ impl ConstantType {
 	const CONSTANT_Module: u8 = 19;
 	const CONSTANT_Package: u8 = 20;
 	
-	pub fn parse<R: Read>(rdr: &mut R, constants: &ConstantPool) -> Result<Self> {
+	pub fn parse<R: Read>(rdr: &mut R) -> Result<Self> {
 		let tag = rdr.read_u8()?;
 		Ok(match tag {
-			ConstantType::CONSTANT_Class => ConstantType::Class {
-				0: ClassInfo {
+			ConstantType::CONSTANT_Class => ConstantType::Class (
+				ClassInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Fieldref => ConstantType::Fieldref {
-				0: FieldRefInfo {
+			),
+			ConstantType::CONSTANT_Fieldref => ConstantType::Fieldref (
+				FieldRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
+			),
 			ConstantType::CONSTANT_Methodref => ConstantType::Methodref (
 				MethodRefInfo {
 					class_index: rdr.read_u16::<BigEndian>()?,
@@ -457,21 +472,17 @@ impl ConstantType {
 			),
 			ConstantType::CONSTANT_String => ConstantType::String (
 				StringInfo {
-					string_index: rdr.read_u16::<BigEndian>()?
+					utf_index: rdr.read_u16::<BigEndian>()?
 				},
 			),
 			ConstantType::CONSTANT_Integer => ConstantType::Integer (
-				IntegerInfo {
-					bytes: rdr.read_i32::<BigEndian>()?
-				},
+				IntegerInfo::new(rdr.read_i32::<BigEndian>()?),
 			),
 			ConstantType::CONSTANT_Float => ConstantType::Float (
 				FloatInfo::new(rdr.read_f32::<BigEndian>()?),
 			),
 			ConstantType::CONSTANT_Long => ConstantType::Long (
-				LongInfo {
-					bytes: rdr.read_i64::<BigEndian>()?
-				},
+				LongInfo::new(rdr.read_i64::<BigEndian>()?),
 			),
 			ConstantType::CONSTANT_Double => ConstantType::Double (
 				DoubleInfo::new(rdr.read_f64::<BigEndian>()?),
@@ -495,55 +506,20 @@ impl ConstantType {
 				ConstantType::Utf8 ( Utf8Info { str } )
 			},
 			ConstantType::CONSTANT_MethodHandle => {
-				let reference_kind = rdr.read_u8()?;
-				let reference_index = rdr.read_u16::<BigEndian>()? as usize;
-				let reference = constants.get(reference_index as CPIndex)?;
-				let handle_kind = match reference_kind {
-					1 => MethodHandleKind::GetField(
-						if let ConstantType::Fieldref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
-					2 => MethodHandleKind::GetStatic(
-						if let ConstantType::Fieldref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
-					3 => MethodHandleKind::PutField(
-						if let ConstantType::Fieldref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
-					4 => MethodHandleKind::PutStatic(
-						if let ConstantType::Fieldref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
-					5 => MethodHandleKind::InvokeVirtual(
-						if let ConstantType::Methodref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
-					6 => MethodHandleKind::InvokeStatic(
-						if let ConstantType::Methodref(x) = reference {
-							x.clone()
-						} else {
-							return Err(ParserError::other(format!("Invalid method handle ref at index {}", reference_index)))
-						}
-					),
+				let kind = match rdr.read_u8()? {
+					MethodHandleKind::REF_getField => MethodHandleKind::GetField,
+					MethodHandleKind::REF_getStatic => MethodHandleKind::GetStatic,
+					MethodHandleKind::REF_putField => MethodHandleKind::PutField,
+					MethodHandleKind::REF_putStatic => MethodHandleKind::PutStatic,
+					MethodHandleKind::REF_invokeVirtual => MethodHandleKind::InvokeVirtual,
+					MethodHandleKind::REF_invokeStatic => MethodHandleKind::InvokeStatic,
+					MethodHandleKind::REF_invokeSpecial => MethodHandleKind::InvokeSpecial,
+					MethodHandleKind::REF_newInvokeSpecial => MethodHandleKind::NewInvokeSpecial,
+					MethodHandleKind::REF_invokeInterface => MethodHandleKind::InvokeInterface,
 					x => return Err(ParserError::other(format!("Unknown method handle type {}", x)))
 				};
-				ConstantType::MethodHandle(MethodHandleInfo::new(handle_kind))
+				let reference = rdr.read_u16::<BigEndian>()?;
+				ConstantType::MethodHandle(MethodHandleInfo::new(kind, reference))
 			},
 			ConstantType::CONSTANT_MethodType => ConstantType::MethodType {
 				0: MethodTypeInfo {
@@ -578,10 +554,82 @@ impl ConstantType {
 	
 	pub fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
 		match self {
-			ConstantType::Class { .. } => {
-				wtr.write_u8(7)?
+			ConstantType::Class(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Class)?;
+				wtr.write_u16::<BigEndian>(x.name_index)?;
 			},
-			_ => return Err(ParserError::unimplemented("Constant Pool Writing"))
+			ConstantType::Fieldref(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Fieldref)?;
+				wtr.write_u16::<BigEndian>(x.class_index)?;
+				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
+			}
+			ConstantType::Methodref(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Methodref)?;
+				wtr.write_u16::<BigEndian>(x.class_index)?;
+				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
+			}
+			ConstantType::InterfaceMethodref(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_InterfaceMethodref)?;
+				wtr.write_u16::<BigEndian>(x.class_index)?;
+				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
+			}
+			ConstantType::String(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_String)?;
+				wtr.write_u16::<BigEndian>(x.utf_index)?;
+			}
+			ConstantType::Integer(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Integer)?;
+				wtr.write_i32::<BigEndian>(x.bytes)?;
+			}
+			ConstantType::Float(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Float)?;
+				wtr.write_f32::<BigEndian>(x.bytes.into())?;
+			}
+			ConstantType::Long(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Long)?;
+				wtr.write_i64::<BigEndian>(x.bytes)?;
+			}
+			ConstantType::Double(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Double)?;
+				wtr.write_f64::<BigEndian>(x.bytes.into())?;
+			}
+			ConstantType::NameAndType(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_NameAndType)?;
+				wtr.write_u16::<BigEndian>(x.name_index)?;
+				wtr.write_u16::<BigEndian>(x.descriptor_index)?;
+			}
+			ConstantType::Utf8(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Utf8)?;
+				let bytes = x.str.as_bytes();
+				let mutf = match mutf8::utf8_to_mutf8(bytes) {
+					Cow::Borrowed(_data) => bytes.into(),
+					Cow::Owned(data) => data.into_boxed_slice(),
+				};
+				wtr.write_all(&*mutf)?;
+			}
+			ConstantType::MethodHandle(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_MethodHandle)?;
+				
+				let reference_kind = match x.kind {
+					MethodHandleKind::GetField => MethodHandleKind::REF_getField,
+					MethodHandleKind::GetStatic => MethodHandleKind::REF_getStatic,
+					MethodHandleKind::PutField => MethodHandleKind::REF_putField,
+					MethodHandleKind::PutStatic => MethodHandleKind::REF_putStatic,
+					MethodHandleKind::InvokeVirtual => MethodHandleKind::REF_invokeVirtual,
+					MethodHandleKind::InvokeStatic => MethodHandleKind::REF_invokeStatic,
+					MethodHandleKind::InvokeSpecial => MethodHandleKind::REF_invokeSpecial,
+					MethodHandleKind::NewInvokeSpecial => MethodHandleKind::REF_newInvokeSpecial,
+					MethodHandleKind::InvokeInterface => MethodHandleKind::REF_invokeInterface,
+				};
+				
+				wtr.write_u8(reference_kind)?;
+				wtr.write_u16::<BigEndian>(x.reference)?;
+			}
+			ConstantType::MethodType(..) => unimplemented!("MethodType"),
+			ConstantType::Dynamic(..) => unimplemented!("Dynamic"),
+			ConstantType::InvokeDynamic(..) => unimplemented!("InvokeDynamic"),
+			ConstantType::Module(..) => unimplemented!("Module"),
+			ConstantType::Package(..) => unimplemented!("Package"),
 		}
 		Ok(())
 	}
@@ -652,7 +700,7 @@ impl ConstantPoolWriter {
 	
 	pub fn string(&mut self, string_index: CPIndex) -> CPIndex {
 		self.put(ConstantType::String(StringInfo {
-			string_index
+			utf_index: string_index
 		}))
 	}
 	
@@ -689,8 +737,9 @@ impl ConstantPoolWriter {
 		}))
 	}
 	
-	pub fn methodhandle(&mut self, reference: MethodHandleKind) -> CPIndex {
+	pub fn methodhandle(&mut self, kind: MethodHandleKind, reference: CPIndex) -> CPIndex {
 		self.put(ConstantType::MethodHandle(MethodHandleInfo {
+			kind,
 			reference
 		}))
 	}
@@ -727,7 +776,7 @@ impl ConstantPoolWriter {
 		}))
 	}
 	
-	pub fn write<W: Write>(&self, wtr: &mut W) -> Result<()> {
+	pub fn write<W: Write>(&mut self, wtr: &mut W) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.index as u16)?;
 		for (constant, _index) in self.inner.iter() {
 			constant.write(wtr)?;

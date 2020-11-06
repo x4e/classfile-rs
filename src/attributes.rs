@@ -53,7 +53,7 @@ impl ConstantValueAttribute {
 			ConstantType::Float(x) => ConstantValue::Float(x.bytes()),
 			ConstantType::Double(x) => ConstantValue::Double(x.bytes()),
 			ConstantType::Integer(x) => ConstantValue::Int(x.bytes),
-			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.string_index)?.str.clone()),
+			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.utf_index)?.str.clone()),
 			x => panic!("Invalid constant value type {:#?} at index {}", x, index)
 		};
 		Ok(ConstantValueAttribute {

@@ -96,6 +96,7 @@ impl ClassFile {
 		Methods::write(&mut cursor, &self.methods, &mut constant_pool)?;
 		Attributes::write(&mut cursor, &self.attributes, &mut constant_pool)?;
 		
+		constant_pool.write(wtr)?;
 		wtr.write_all(cursor.get_ref().as_slice())?;
 		
 		Ok(())

@@ -976,7 +976,7 @@ impl InsnParser {
 	fn parse_ldc(index: CPIndex, constant_pool: &ConstantPool) -> Result<Insn> {
 		let constant = constant_pool.get(index)?;
 		let ldc_type = match constant {
-			ConstantType::String(x) => LdcType::String(constant_pool.utf8(x.string_index)?.str.clone()),
+			ConstantType::String(x) => LdcType::String(constant_pool.utf8(x.utf_index)?.str.clone()),
 			ConstantType::Integer(x) => LdcType::Int(x.bytes),
 			ConstantType::Float(x) => LdcType::Float(x.bytes()),
 			ConstantType::Double(x) => LdcType::Double(x.bytes()),

@@ -6,8 +6,9 @@ use std::io::{Read, Write};
 use crate::Serializable;
 use byteorder::{BigEndian, ReadBytesExt};
 use crate::error::Result;
-use crate::utils::mut_retain;
-use crate::insnlist::InsnList;
+use crate::utils::{mut_retain};
+use crate::code::CodeAttribute;
+use std::mem::zeroed;
 
 #[allow(non_snake_case)]
 pub mod Methods {
@@ -42,7 +43,7 @@ pub struct Method {
 	descriptor: String,
 	signature: Option<String>,
 	exceptions: Vec<String>,
-	code: Option<InsnList>,
+	code: Option<CodeAttribute>,
 	attributes: Vec<Attribute>
 }
 
@@ -52,15 +53,17 @@ impl Method {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let mut signature: Option<String> = None;
+		#[allow(invalid_value)]
 		let mut exceptions: Vec<String> = Vec::new();
-		let mut code: Option<InsnList> = None;
+		let mut code: Option<CodeAttribute> = None;
 		let mut attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
 		
 		mut_retain(&mut attributes, |attribute| {
 			match attribute {
 				Attribute::Signature(signature_attr) => {
 					// The attribute will be dropped, so instead of cloning we can swap an empty string for the signature
-					let mut rep = String::new();
+					#[allow(invalid_value)]
+					let mut rep = unsafe { zeroed() };
 					std::mem::swap(&mut rep, &mut signature_attr.signature);
 					signature = Some(rep);
 					false
@@ -70,8 +73,9 @@ impl Method {
 					false
 				},
 				Attribute::Code(code_attr) => {
-					let mut rep = InsnList::new();
-					std::mem::swap(&mut rep, &mut code_attr.code);
+					#[allow(invalid_value)]
+					let mut rep: CodeAttribute = unsafe { zeroed() };
+					std::mem::swap(&mut rep, code_attr);
 					code = Some(rep);
 					false
 				}

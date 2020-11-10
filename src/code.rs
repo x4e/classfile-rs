@@ -6,15 +6,16 @@ use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
-use crate::utils::ReadUtils;
+use crate::utils::{ReadUtils, uninit};
 use std::collections::{HashMap};
 use std::mem;
+use bitflags::_core::mem::zeroed;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
 	pub max_stack: u16,
 	pub max_locals: u16,
-	pub code: InsnList,
+	pub insns: InsnList,
 	pub exceptions: Vec<ExceptionHandler>,
 	pub attributes: Vec<Attribute>
 }
@@ -38,7 +39,7 @@ impl CodeAttribute {
 		Ok(CodeAttribute {
 			max_stack,
 			max_locals,
-			code,
+			insns: code,
 			exceptions,
 			attributes
 		})
@@ -934,10 +935,11 @@ impl InsnParser {
 			insns.reserve_exact(insert.len());
 			for (index, insert) in insert.iter_mut() {
 				let index = *index;
-				let mut empty = Vec::with_capacity(0);
+				#[allow(invalid_value)]
+				let mut empty = unsafe { zeroed() };
 				mem::swap(insert, &mut empty);
 				for insn in empty.iter_mut() {
-					let mut empty: Insn = unsafe { std::mem::zeroed() };
+					let mut empty: Insn = unsafe { uninit() };
 					mem::swap(insn, &mut empty);
 					if index <= insns.len() {
 						insns.insert(index, empty);

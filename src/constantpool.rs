@@ -521,33 +521,33 @@ impl ConstantType {
 				let reference = rdr.read_u16::<BigEndian>()?;
 				ConstantType::MethodHandle(MethodHandleInfo::new(kind, reference))
 			},
-			ConstantType::CONSTANT_MethodType => ConstantType::MethodType {
-				0: MethodTypeInfo {
+			ConstantType::CONSTANT_MethodType => ConstantType::MethodType (
+				MethodTypeInfo {
 					descriptor_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Dynamic => ConstantType::Dynamic {
-				0: DynamicInfo {
+			),
+			ConstantType::CONSTANT_Dynamic => ConstantType::Dynamic (
+				DynamicInfo {
 					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_InvokeDynamic => ConstantType::InvokeDynamic {
-				0: InvokeDynamicInfo {
+			),
+			ConstantType::CONSTANT_InvokeDynamic => ConstantType::InvokeDynamic (
+				InvokeDynamicInfo {
 					bootstrap_method_attr_index: rdr.read_u16::<BigEndian>()?,
 					name_and_type_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Module => ConstantType::Module {
-				0: ModuleInfo {
+			),
+			ConstantType::CONSTANT_Module => ConstantType::Module (
+				ModuleInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
-			ConstantType::CONSTANT_Package => ConstantType::Package {
-				0: PackageInfo {
+			),
+			ConstantType::CONSTANT_Package => ConstantType::Package (
+				PackageInfo {
 					name_index: rdr.read_u16::<BigEndian>()?
 				},
-			},
+			),
 			_ => return Err(ParserError::unrecognised("constant tag", tag.to_string()))
 		})
 	}
@@ -625,11 +625,23 @@ impl ConstantType {
 				wtr.write_u8(reference_kind)?;
 				wtr.write_u16::<BigEndian>(x.reference)?;
 			}
-			ConstantType::MethodType(..) => unimplemented!("MethodType"),
-			ConstantType::Dynamic(..) => unimplemented!("Dynamic"),
-			ConstantType::InvokeDynamic(..) => unimplemented!("InvokeDynamic"),
-			ConstantType::Module(..) => unimplemented!("Module"),
-			ConstantType::Package(..) => unimplemented!("Package"),
+			ConstantType::MethodType(x) => {
+				wtr.write_u16::<BigEndian>(x.descriptor_index)?;
+			},
+			ConstantType::Dynamic(x) => {
+				wtr.write_u16::<BigEndian>(x.bootstrap_method_attr_index)?;
+				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
+			},
+			ConstantType::InvokeDynamic(x) => {
+				wtr.write_u16::<BigEndian>(x.bootstrap_method_attr_index)?;
+				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
+			},
+			ConstantType::Module(x) => {
+				wtr.write_u16::<BigEndian>(x.name_index)?;
+			},
+			ConstantType::Package(x) => {
+				wtr.write_u16::<BigEndian>(x.name_index)?;
+			},
 		}
 		Ok(())
 	}

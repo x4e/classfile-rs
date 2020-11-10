@@ -1,4 +1,14 @@
 use std::io::Read;
+use std::mem::MaybeUninit;
+
+/// Return uninitialised memory
+/// VERY UNSAFE
+/// only use for when the value will never be used
+/// DO NOT USE FOR ANY STRUCTS CONTAINING POINTERS
+/// (the pointers will be garbage and will fail to be freed when the struct is dropped)
+pub unsafe fn uninit<T>() -> T {
+	MaybeUninit::uninit().assume_init()
+}
 
 pub fn mut_retain<T, F>(this: &mut Vec<T>, mut f: F)
 	where

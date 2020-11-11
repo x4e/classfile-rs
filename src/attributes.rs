@@ -61,10 +61,20 @@ impl ConstantValueAttribute {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(0)?; // write name
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(constant_pool.utf8("ConstantValue"))?; // write name
 		wtr.write_u32::<BigEndian>(2)?; // length
-		wtr.write_u16::<BigEndian>(0)?; // cp ref
+		let const_ref = match self.value.clone() {
+			ConstantValue::Long(x) => constant_pool.long(x),
+			ConstantValue::Float(x) => constant_pool.float(x),
+			ConstantValue::Double(x) => constant_pool.double(x),
+			ConstantValue::Int(x) => constant_pool.integer(x),
+			ConstantValue::String(x) => {
+				let utf = constant_pool.utf8(x);
+				constant_pool.string(utf)
+			}
+		};
+		wtr.write_u16::<BigEndian>(const_ref)?; // cp ref
 		Ok(())
 	}
 }
@@ -83,10 +93,10 @@ impl SignatureAttribute {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(0)?; // write name
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(constant_pool.utf8("Signature"))?; // write name
 		wtr.write_u32::<BigEndian>(2)?; // length
-		wtr.write_u16::<BigEndian>(0)?; // cp ref
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.signature.clone()))?; // cp ref
 		Ok(())
 	}
 }
@@ -109,11 +119,13 @@ impl ExceptionsAttribute {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
-		for _exception in self.exceptions.iter() {
-			// write exception
-			wtr.write_u16::<BigEndian>(0)?;
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(constant_pool.utf8("Exceptions"))?; // write name
+		let num_exceptions = self.exceptions.len() as u16;
+		wtr.write_u32::<BigEndian>(2 + (num_exceptions as u32 * 2))?; // length
+		wtr.write_u16::<BigEndian>(num_exceptions)?;
+		for exception in self.exceptions.iter() {
+			wtr.write_u16::<BigEndian>(constant_pool.utf8(exception.clone()))?;
 		}
 		Ok(())
 	}
@@ -139,9 +151,10 @@ impl SourceFileAttribute {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(0)?; // write name
-		wtr.write_u16::<BigEndian>(0)?; // write source file
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(constant_pool.utf8("SourceFile"))?; // write name
+		wtr.write_u32::<BigEndian>(2)?; // length
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.source_file.clone()))?;
 		Ok(())
 	}
 }

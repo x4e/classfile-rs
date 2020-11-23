@@ -44,7 +44,7 @@ pub enum ReturnType {
 	Double
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LabelInsn {
 	/// unique identifier
 	pub(crate) id: u32

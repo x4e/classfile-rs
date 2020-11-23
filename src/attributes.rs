@@ -121,9 +121,9 @@ impl ExceptionsAttribute {
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(constant_pool.utf8("Exceptions"))?; // write name
-		let num_exceptions = self.exceptions.len() as u16;
+		let num_exceptions = self.exceptions.len();
 		wtr.write_u32::<BigEndian>(2 + (num_exceptions as u32 * 2))?; // length
-		wtr.write_u16::<BigEndian>(num_exceptions)?;
+		wtr.write_u16::<BigEndian>(num_exceptions as u16)?;
 		for exception in self.exceptions.iter() {
 			wtr.write_u16::<BigEndian>(constant_pool.utf8(exception.clone()))?;
 		}

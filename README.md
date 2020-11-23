@@ -17,3 +17,14 @@ Todos:
 * Stackmap frame generation
 * Class writing
 (Feel free to contribute on these)
+
+## Speed
+The library should take <1ms to read an averagely sized class file, but can take longer depending on the amount of
+ control flow within the class (Label reading is not optimal at the moment).
+
+Here is a benchmark:
+![Throughput benchmark](https://i.imgur.com/7JhSLAg.png)
+
+## Examples
+[Reading a class file](https://github.com/x4e/classfile-rs/tree/master/examples/read/src/main.rs)
+

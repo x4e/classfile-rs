@@ -38,13 +38,13 @@ pub mod Methods {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Method {
-	access_flags: MethodAccessFlags,
-	name: String,
-	descriptor: String,
-	signature: Option<String>,
-	exceptions: Vec<String>,
-	code: Option<CodeAttribute>,
-	attributes: Vec<Attribute>
+	pub access_flags: MethodAccessFlags,
+	pub name: String,
+	pub descriptor: String,
+	pub signature: Option<String>,
+	pub exceptions: Vec<String>,
+	pub code: Option<CodeAttribute>,
+	pub attributes: Vec<Attribute>
 }
 
 impl Method {

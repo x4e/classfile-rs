@@ -37,11 +37,11 @@ pub mod Fields {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Field {
-	access_flags: FieldAccessFlags,
-	name: String,
-	descriptor: String,
-	signature: Option<String>,
-	attributes: Vec<Attribute>
+	pub access_flags: FieldAccessFlags,
+	pub name: String,
+	pub descriptor: String,
+	pub signature: Option<String>,
+	pub attributes: Vec<Attribute>
 }
 
 impl Field {

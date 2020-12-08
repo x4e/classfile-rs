@@ -7,7 +7,6 @@ use crate::attributes::{Attributes, Attribute, AttributeSource};
 use crate::version::ClassVersion;
 use crate::error::Result;
 use crate::utils::mut_retain;
-use std::mem::zeroed;
 
 #[allow(non_snake_case)]
 pub mod Fields {
@@ -56,7 +55,7 @@ impl Field {
 			if let Attribute::Signature(signature_attr) = attribute {
 				// The attribute will be dropped, so instead of cloning we can swap an empty string for the signature
 				#[allow(invalid_value)]
-				let mut rep = unsafe { zeroed() };
+				let mut rep = String::new();
 				std::mem::swap(&mut rep, &mut signature_attr.signature);
 				signature = Some(rep);
 				false

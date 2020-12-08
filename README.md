@@ -9,7 +9,7 @@ Goals:
 * Resistant to malicious/malformed class files
 
 The AST is designed to be more logical and intuitive than the official bytecode specification. 
-For example, `iconst_0`s are represented as `ldc(0)`s, `incokestatic(...)`s are represented as `invoke(static, ...)`.
+For example, `iconst_0`s are represented as `ldc(0)`s, `invokestatic(...)`s are represented as `invoke(static, ...)`.
 Bytecode offsets are also transformed into labels.
 The constant pool is fully abstracted.
 

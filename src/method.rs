@@ -8,7 +8,6 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crate::error::Result;
 use crate::utils::{mut_retain};
 use crate::code::CodeAttribute;
-use std::mem::zeroed;
 
 #[allow(non_snake_case)]
 pub mod Methods {
@@ -62,8 +61,7 @@ impl Method {
 			match attribute {
 				Attribute::Signature(signature_attr) => {
 					// The attribute will be dropped, so instead of cloning we can swap an empty string for the signature
-					#[allow(invalid_value)]
-					let mut rep = unsafe { zeroed() };
+					let mut rep = String::with_capacity(0);
 					std::mem::swap(&mut rep, &mut signature_attr.signature);
 					signature = Some(rep);
 					false
@@ -73,8 +71,7 @@ impl Method {
 					false
 				},
 				Attribute::Code(code_attr) => {
-					#[allow(invalid_value)]
-					let mut rep: CodeAttribute = unsafe { zeroed() };
+					let mut rep: CodeAttribute = CodeAttribute::empty();
 					std::mem::swap(&mut rep, code_attr);
 					code = Some(rep);
 					false

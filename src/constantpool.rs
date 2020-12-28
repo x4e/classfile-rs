@@ -626,6 +626,7 @@ impl ConstantType {
 					Cow::Borrowed(_data) => bytes.into(),
 					Cow::Owned(data) => data.into_boxed_slice(),
 				};
+				wtr.write_u16::<BigEndian>(mutf.len() as u16)?;
 				wtr.write_all(&*mutf)?;
 			}
 			ConstantType::MethodHandle(x) => {
@@ -647,20 +648,25 @@ impl ConstantType {
 				wtr.write_u16::<BigEndian>(x.reference)?;
 			}
 			ConstantType::MethodType(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_MethodType)?;
 				wtr.write_u16::<BigEndian>(x.descriptor_index)?;
 			},
 			ConstantType::Dynamic(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Dynamic)?;
 				wtr.write_u16::<BigEndian>(x.bootstrap_method_attr_index)?;
 				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
 			},
 			ConstantType::InvokeDynamic(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_InvokeDynamic)?;
 				wtr.write_u16::<BigEndian>(x.bootstrap_method_attr_index)?;
 				wtr.write_u16::<BigEndian>(x.name_and_type_index)?;
 			},
 			ConstantType::Module(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Module)?;
 				wtr.write_u16::<BigEndian>(x.name_index)?;
 			},
 			ConstantType::Package(x) => {
+				wtr.write_u8(ConstantType::CONSTANT_Package)?;
 				wtr.write_u16::<BigEndian>(x.name_index)?;
 			},
 		}

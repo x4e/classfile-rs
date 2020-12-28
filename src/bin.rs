@@ -1,6 +1,6 @@
 use std::time::Instant;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::{BufReader, BufWriter};
 use std::env;
 
 use classfile::classfile::ClassFile;
@@ -20,6 +20,14 @@ fn main() {
 		let elapsed = start.elapsed();
 		println!("{:#x?}", class);
 		println!("Finished parsing {} in {:#?}", file, elapsed);
+		
+		if let Ok(class) = class {
+			if let Some(file) = args.get(2) {
+				let f = File::create(file).unwrap();
+				let mut writer = BufWriter::new(f);
+				class.write(&mut writer).unwrap();
+			}
+		}
 	} else {
 		panic!("Please provide a file to dissasemble");
 	}

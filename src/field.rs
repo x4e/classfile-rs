@@ -2,8 +2,8 @@ use crate::Serializable;
 use std::io::{Read, Write};
 use crate::access::FieldAccessFlags;
 use crate::constantpool::{ConstantPool, ConstantPoolWriter};
-use byteorder::{ReadBytesExt, BigEndian};
-use crate::attributes::{Attributes, Attribute, AttributeSource};
+use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
+use crate::attributes::{Attributes, Attribute, AttributeSource, SignatureAttribute};
 use crate::version::ClassVersion;
 use crate::error::Result;
 use crate::utils::mut_retain;
@@ -75,7 +75,14 @@ impl Field {
 	
 	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		self.access_flags.write(wtr)?;
-		Attributes::write(wtr, &self.attributes, constant_pool)?;
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()));
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()));
+		let extra = if let Some(sig) = self.signature.clone() {
+			Some(vec![Attribute::Signature(SignatureAttribute::new(sig))])
+		} else {
+			None
+		};
+		Attributes::write_with_extra(wtr, &self.attributes, extra, constant_pool)?;
 		Ok(())
 	}
 }

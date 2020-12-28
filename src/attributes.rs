@@ -23,9 +23,18 @@ pub mod Attributes {
 	}
 	
 	pub fn write<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
+		write_with_extra(wtr, attributes, None, constant_pool)
+	}
+	
+	pub fn write_with_extra<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, extra: Option<Vec<Attribute>>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
 			attribute.write(wtr, constant_pool)?;
+		}
+		if let Some(extra) = extra {
+			for attribute in extra.iter() {
+				attribute.write(wtr, constant_pool)?;
+			}
 		}
 		Ok(())
 	}
@@ -85,6 +94,12 @@ pub struct SignatureAttribute {
 }
 
 impl SignatureAttribute {
+	pub fn new(signature: String) -> Self {
+		SignatureAttribute {
+			signature
+		}
+	}
+	
 	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
 		let index = buf.as_slice().read_u16::<BigEndian>()?;
 		let signature = constant_pool.utf8(index)?.str.clone();

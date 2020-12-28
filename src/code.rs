@@ -988,10 +988,10 @@ impl InsnParser {
 		let constant = constant_pool.get(index)?;
 		let ldc_type = match constant {
 			ConstantType::String(x) => LdcType::String(constant_pool.utf8(x.utf_index)?.str.clone()),
-			ConstantType::Integer(x) => LdcType::Int(x.bytes),
-			ConstantType::Float(x) => LdcType::Float(x.bytes()),
-			ConstantType::Double(x) => LdcType::Double(x.bytes()),
-			ConstantType::Long(x) => LdcType::Long(x.bytes),
+			ConstantType::Integer(x) => LdcType::Int(x.inner()),
+			ConstantType::Float(x) => LdcType::Float(x.inner()),
+			ConstantType::Double(x) => LdcType::Double(x.inner()),
+			ConstantType::Long(x) => LdcType::Long(x.inner()),
 			ConstantType::Class(x) => LdcType::Class(constant_pool.utf8(x.name_index)?.str.clone()),
 			ConstantType::MethodType(x) => LdcType::MethodType(constant_pool.utf8(x.descriptor_index)?.str.clone()),
 			ConstantType::MethodHandle(x) => return Err(ParserError::unimplemented("MethodHandle LDC")),

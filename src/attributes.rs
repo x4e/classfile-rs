@@ -49,10 +49,10 @@ impl ConstantValueAttribute {
 	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
 		let index = buf.as_slice().read_u16::<BigEndian>()?;
 		let value = match constant_pool.get(index)? {
-			ConstantType::Long(x) => ConstantValue::Long(x.bytes),
-			ConstantType::Float(x) => ConstantValue::Float(x.bytes()),
-			ConstantType::Double(x) => ConstantValue::Double(x.bytes()),
-			ConstantType::Integer(x) => ConstantValue::Int(x.bytes),
+			ConstantType::Long(x) => ConstantValue::Long(x.inner()),
+			ConstantType::Float(x) => ConstantValue::Float(x.inner()),
+			ConstantType::Double(x) => ConstantValue::Double(x.inner()),
+			ConstantType::Integer(x) => ConstantValue::Int(x.inner()),
 			ConstantType::String(x) => ConstantValue::String(constant_pool.utf8(x.utf_index)?.str.clone()),
 			x => panic!("Invalid constant value type {:#?} at index {}", x, index)
 		};

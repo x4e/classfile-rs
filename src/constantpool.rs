@@ -1,13 +1,14 @@
 use crate::Serializable;
+use crate::utils::ReadUtils;
+use crate::error::{Result, ParserError};
 use std::io::{Read, Write};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use std::borrow::{Cow};
 use derive_more::Constructor;
-use crate::error::{Result, ParserError};
 use enum_display_derive::DisplayDebug;
 use std::fmt::{Debug, Formatter};
 use linked_hash_map::LinkedHashMap;
-use crate::utils::{CustomFloat, CustomDouble, ReadUtils};
+use std::hash::{Hash};
 
 pub type CPIndex = u16;
 
@@ -300,40 +301,60 @@ pub struct MethodRefInfo {
 pub struct StringInfo {
 	pub utf_index: CPIndex
 }
+
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IntegerInfo {
-	pub bytes: i32
+	inner: i32
 }
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FloatInfo {
-	bytes: CustomFloat
-}
-impl FloatInfo {
-	pub fn new(bytes: f32) -> Self {
-		FloatInfo {
-			bytes: CustomFloat::new(bytes)
-		}
-	}
-	pub fn bytes(&self) -> f32 {
-		self.bytes.into()
+impl IntegerInfo {
+	pub fn inner(&self) -> i32 {
+		self.inner
 	}
 }
+
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LongInfo {
-	pub bytes: i64
+	inner: i64
 }
+impl LongInfo {
+	pub fn inner(&self) -> i64 {
+		self.inner
+	}
+}
+
+/// Rust floats do not support Eq and Hash
+/// This is because its just too hard to correctly compare floats
+/// For our purpose however we dont care too much about equality and more about not (?) equality
+/// In the end if two of the same floats are not compared equal to each other then we just make
+/// two constant pool entries and who cares
+/// Because of this we will store the float as an integer and let rust do integer comparisons on it
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct DoubleInfo {
-	bytes: CustomDouble
+pub struct FloatInfo {
+	inner: u32
 }
-impl DoubleInfo {
-	pub fn new(bytes: f64) -> Self {
-		DoubleInfo {
-			bytes: CustomDouble::new(bytes)
+impl FloatInfo {
+	pub fn new(inner: f32) -> Self {
+		FloatInfo {
+			inner: inner.to_bits()
 		}
 	}
-	pub fn bytes(&self) -> f64 {
-		self.bytes.into()
+	pub fn inner(&self) -> f32 {
+		f32::from_bits(self.inner)
+	}
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DoubleInfo {
+	inner: u64
+}
+impl DoubleInfo {
+	pub fn new(inner: f64) -> Self {
+		DoubleInfo {
+			inner: inner.to_bits()
+		}
+	}
+	pub fn inner(&self) -> f64 {
+		f64::from_bits(self.inner)
 	}
 }
 
@@ -579,19 +600,19 @@ impl ConstantType {
 			}
 			ConstantType::Integer(x) => {
 				wtr.write_u8(ConstantType::CONSTANT_Integer)?;
-				wtr.write_i32::<BigEndian>(x.bytes)?;
+				wtr.write_i32::<BigEndian>(x.inner())?;
 			}
 			ConstantType::Float(x) => {
 				wtr.write_u8(ConstantType::CONSTANT_Float)?;
-				wtr.write_f32::<BigEndian>(x.bytes.into())?;
+				wtr.write_f32::<BigEndian>(x.inner())?;
 			}
 			ConstantType::Long(x) => {
 				wtr.write_u8(ConstantType::CONSTANT_Long)?;
-				wtr.write_i64::<BigEndian>(x.bytes)?;
+				wtr.write_i64::<BigEndian>(x.inner())?;
 			}
 			ConstantType::Double(x) => {
 				wtr.write_u8(ConstantType::CONSTANT_Double)?;
-				wtr.write_f64::<BigEndian>(x.bytes.into())?;
+				wtr.write_f64::<BigEndian>(x.inner())?;
 			}
 			ConstantType::NameAndType(x) => {
 				wtr.write_u8(ConstantType::CONSTANT_NameAndType)?;
@@ -717,9 +738,7 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn integer(&mut self, bytes: i32) -> CPIndex {
-		self.put(ConstantType::Integer(IntegerInfo {
-			bytes
-		}))
+		self.put(ConstantType::Integer(IntegerInfo::new(bytes)))
 	}
 	
 	pub fn float(&mut self, bytes: f32) -> CPIndex {
@@ -727,9 +746,7 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn long(&mut self, bytes: i64) -> CPIndex {
-		self.put(ConstantType::Long(LongInfo {
-			bytes
-		}))
+		self.put(ConstantType::Long(LongInfo::new(bytes)))
 	}
 	
 	pub fn double(&mut self, bytes: f64) -> CPIndex {

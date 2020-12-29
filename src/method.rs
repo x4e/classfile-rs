@@ -1,13 +1,13 @@
 use crate::access::MethodAccessFlags;
-use crate::attributes::{Attribute, Attributes, AttributeSource};
+use crate::attributes::{Attribute, Attributes, AttributeSource, SignatureAttribute, ExceptionsAttribute};
 use crate::version::ClassVersion;
 use crate::constantpool::{ConstantPool, ConstantPoolWriter};
-use std::io::{Read, Write};
 use crate::Serializable;
-use byteorder::{BigEndian, ReadBytesExt};
 use crate::error::Result;
 use crate::utils::{mut_retain};
 use crate::code::CodeAttribute;
+use std::io::{Read, Write};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 #[allow(non_snake_case)]
 pub mod Methods {
@@ -80,7 +80,7 @@ impl Method {
 			}
 		});
 		
-		Ok(Method {
+		let meth = Method {
 			access_flags,
 			name,
 			descriptor,
@@ -88,11 +88,15 @@ impl Method {
 			exceptions,
 			code,
 			attributes
-		})
+		};
+		println!("{:#x?}", meth);
+		Ok(meth)
 	}
 	
 	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		self.access_flags.write(wtr)?;
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
 		Attributes::write(wtr, &self.attributes, constant_pool)?;
 		Ok(())
 	}

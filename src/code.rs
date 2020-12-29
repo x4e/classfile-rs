@@ -9,8 +9,9 @@ use crate::insnlist::InsnList;
 use crate::utils::{ReadUtils};
 use std::collections::{HashMap};
 use std::mem;
+use derive_more::Constructor;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
 	pub max_stack: u16,
 	pub max_locals: u16,

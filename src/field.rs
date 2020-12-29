@@ -1,12 +1,12 @@
 use crate::Serializable;
-use std::io::{Read, Write};
 use crate::access::FieldAccessFlags;
 use crate::constantpool::{ConstantPool, ConstantPoolWriter};
-use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::attributes::{Attributes, Attribute, AttributeSource, SignatureAttribute};
 use crate::version::ClassVersion;
 use crate::error::Result;
-use crate::utils::mut_retain;
+use crate::utils::{mut_retain, remove_first, replace_first, VecUtils};
+use std::io::{Read, Write};
+use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 
 #[allow(non_snake_case)]
 pub mod Fields {
@@ -39,7 +39,6 @@ pub struct Field {
 	pub access_flags: FieldAccessFlags,
 	pub name: String,
 	pub descriptor: String,
-	pub signature: Option<String>,
 	pub attributes: Vec<Attribute>
 }
 
@@ -48,40 +47,52 @@ impl Field {
 		let access_flags = FieldAccessFlags::parse(rdr)?;
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		let mut signature: Option<String> = None;
 		let mut attributes = Attributes::parse(rdr, AttributeSource::Field, version, constant_pool)?;
-		
-		mut_retain(&mut attributes, |attribute| {
-			if let Attribute::Signature(signature_attr) = attribute {
-				// The attribute will be dropped, so instead of cloning we can swap an empty string for the signature
-				#[allow(invalid_value)]
-				let mut rep = String::new();
-				std::mem::swap(&mut rep, &mut signature_attr.signature);
-				signature = Some(rep);
-				false
-			} else {
-				true
-			}
-		});
 		
 		Ok(Field {
 			access_flags,
 			name,
 			descriptor,
-			signature,
 			attributes
 		})
 	}
 	
+	pub fn signature(&self) -> Option<String> {
+		for attr in self.attributes.iter() {
+			if let Attribute::Signature(sig) = attr {
+				return Some(sig.signature.clone())
+			}
+		}
+		return None
+	}
+	
+	pub fn set_signature(&mut self, sig: Option<String>) {
+		// According to the JVM spec there must be at most one signature attribute in the attributes table
+		// first find the index of the existing sig
+		let mut index = self.attributes.find_first(|attr| {
+			if let Attribute::Signature(_) = attr { true } else { false }
+		});
+		match sig {
+			Some(sig) => {
+				let attr = Attribute::Signature(SignatureAttribute::new(sig.clone()));
+				if let Some(index) = index {
+					self.attributes.replace(index, attr)
+				} else {
+					self.attributes.push(attr)
+				}
+			}
+			None => {
+				if let Some(index) = index {
+					self.attributes.remove(index);
+				}
+			}
+		};
+	}
+	
 	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		self.access_flags.write(wtr)?;
-		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()));
-		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()));
-		let extra = if let Some(sig) = self.signature.clone() {
-			Some(vec![Attribute::Signature(SignatureAttribute::new(sig))])
-		} else {
-			None
-		};
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
 		Attributes::write_with_extra(wtr, &self.attributes, extra, constant_pool)?;
 		Ok(())
 	}

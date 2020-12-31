@@ -31,7 +31,7 @@ impl InsnList {
 		LabelInsn::new(id)
 	}
 	
-	pub fn iter(&mut self) -> Iter<'_, Insn> {
+	pub fn iter(&self) -> Iter<'_, Insn> {
 		self.insns.iter()
 	}
 }

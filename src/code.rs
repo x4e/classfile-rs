@@ -55,10 +55,11 @@ impl CodeAttribute {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(0)?; // write name
-		wtr.write_u32::<BigEndian>(2)?; // length
-		wtr.write_u16::<BigEndian>(0)?; // cp ref
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_u16::<BigEndian>(self.max_stack)?;
+		wtr.write_u16::<BigEndian>(self.max_locals)?;
+		wtr.write_u16::<BigEndian>(self.max_stack)?;
+		InsnParser::write_insns(wtr, self, constant_pool)?;
 		Ok(())
 	}
 }
@@ -356,6 +357,7 @@ impl InsnParser {
 				InsnParser::ASTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 2)),
 				InsnParser::ASTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 3)),
 				InsnParser::ATHROW => Insn::Throw(ThrowInsn::new()),
+				// BALOAD is both byte and boolean (they are same size on hotspot) we will assume byte
 				InsnParser::BALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Byte))),
 				InsnParser::BASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Byte))),
 				InsnParser::BIPUSH => {
@@ -1004,5 +1006,395 @@ impl InsnParser {
 			))
 		};
 		Ok(Insn::Ldc(LdcInsn::new(ldc_type)))
+	}
+	
+	fn write_insns<T: Write>(wtr: &mut T, code: &CodeAttribute, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		let mut label_pc_map: HashMap<LabelInsn, u32> = HashMap::new();
+		
+		let mut pc = 0u32;
+		for insn in code.insns.iter() {
+			match insn {
+				Insn::Label(x) => {
+					label_pc_map.insert(x.clone(), pc);
+				}
+				Insn::ArrayLoad(x) => {
+					match &x.kind {
+						Type::Reference(x) => wtr.write_u8(InsnParser::AALOAD)?,
+						Type::Primitive(x) => {
+							match x {
+								PrimitiveType::Byte => wtr.write_u8(InsnParser::BALOAD)?,
+								PrimitiveType::Char => wtr.write_u8(InsnParser::CALOAD)?,
+								PrimitiveType::Short => wtr.write_u8(InsnParser::SALOAD)?,
+								PrimitiveType::Int => wtr.write_u8(InsnParser::IALOAD)?,
+								PrimitiveType::Long => wtr.write_u8(InsnParser::LALOAD)?,
+								PrimitiveType::Float => wtr.write_u8(InsnParser::FALOAD)?,
+								PrimitiveType::Double => wtr.write_u8(InsnParser::DALOAD)?,
+								PrimitiveType::Boolean => wtr.write_u8(InsnParser::BALOAD)?
+							}
+						}
+					}
+					pc = pc.checked_add(1)?;
+				}
+				Insn::ArrayStore(x) => {
+					match &x.kind {
+						Type::Reference(x) => wtr.write_u8(InsnParser::AASTORE)?,
+						Type::Primitive(x) => {
+							match x {
+								PrimitiveType::Byte => wtr.write_u8(InsnParser::BASTORE)?,
+								PrimitiveType::Char => wtr.write_u8(InsnParser::CASTORE)?,
+								PrimitiveType::Short => wtr.write_u8(InsnParser::SASTORE)?,
+								PrimitiveType::Int => wtr.write_u8(InsnParser::IASTORE)?,
+								PrimitiveType::Long => wtr.write_u8(InsnParser::LASTORE)?,
+								PrimitiveType::Float => wtr.write_u8(InsnParser::FASTORE)?,
+								PrimitiveType::Double => wtr.write_u8(InsnParser::DASTORE)?,
+								PrimitiveType::Boolean => wtr.write_u8(InsnParser::BASTORE)?
+							}
+						}
+					}
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Ldc(x) => {
+					pc = pc.checked_add(match &x.constant {
+						LdcType::Null => {
+							wtr.write_u8(InsnParser::ACONST_NULL)?;
+							1
+						}
+						LdcType::String(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.string(constant_pool.utf8(x)), false)?
+						}
+						LdcType::Int(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.integer(*x), false)?
+						}
+						LdcType::Float(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.float(*x), false)?
+						}
+						LdcType::Long(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.long(*x), false)?
+						}
+						LdcType::Double(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.double(*x), false)?
+						}
+						LdcType::Class(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.class(constant_pool.utf8(x.clone())), false)?
+						}
+						LdcType::MethodType(x) => {
+							InsnParser::write_ldc(wtr, constant_pool.methodtype(constant_pool.utf8(x.clone())), false)?
+						}
+						LdcType::MethodHandle() => return Err(ParserError::invalid_insn(pc, "MethodHandle LDC")),
+						LdcType::Dynamic() => return Err(ParserError::invalid_insn(pc, "Dynamic LDC")),
+					})?;
+				}
+				Insn::LocalLoad(x) => {
+					let (op0, op1, op2, op3, opx) = match &x.kind {
+						OpType::Reference => (InsnParser::ALOAD_0, InsnParser::ALOAD_1, InsnParser::ALOAD_2, InsnParser::ALOAD_3, InsnParser::ALOAD),
+						OpType::Int => (InsnParser::ILOAD_0, InsnParser::ILOAD_1, InsnParser::ILOAD_2, InsnParser::ILOAD_3, InsnParser::ILOAD),
+						OpType::Float => (InsnParser::FLOAD_0, InsnParser::FLOAD_1, InsnParser::FLOAD_2, InsnParser::FLOAD_3, InsnParser::FLOAD),
+						OpType::Double => (InsnParser::DLOAD_0, InsnParser::DLOAD_1, InsnParser::DLOAD_2, InsnParser::DLOAD_3, InsnParser::DLOAD),
+						OpType::Long => (InsnParser::LLOAD_0, InsnParser::LLOAD_1, InsnParser::LLOAD_2, InsnParser::LLOAD_3, InsnParser::LLOAD),
+					};
+					match x.index {
+						0 => {
+							wtr.write_u8(op0)?;
+							pc = pc.checked_add(1)?;
+						}
+						1 => {
+							wtr.write_u8(op1)?;
+							pc = pc.checked_add(1)?;
+						}
+						2 => {
+							wtr.write_u8(op2)?;
+							pc = pc.checked_add(1)?;
+						}
+						3 => {
+							wtr.write_u8(op3)?;
+							pc = pc.checked_add(1)?;
+						}
+						index => {
+							if index <= 0xFF {
+								wtr.write_u8(opx)?;
+								wtr.write_u8(index as u8)?;
+								pc = pc.checked_add(2)?;
+							} else {
+								wtr.write_u8(InsnParser::WIDE)?;
+								wtr.write_u8(opx)?;
+								wtr.write_u16::<BigEndian>(index)?;
+								pc = pc.checked_add(4)?;
+							}
+						}
+					}
+				}
+				Insn::LocalStore(x) => {
+					let (op0, op1, op2, op3, opx) = match &x.kind {
+						OpType::Reference => (InsnParser::ASTORE_0, InsnParser::ASTORE_1, InsnParser::ASTORE_2, InsnParser::ASTORE_3, InsnParser::ASTORE),
+						OpType::Int => (InsnParser::ISTORE_0, InsnParser::ISTORE_1, InsnParser::ISTORE_2, InsnParser::ISTORE_3, InsnParser::ISTORE),
+						OpType::Float => (InsnParser::FSTORE_0, InsnParser::FSTORE_1, InsnParser::FSTORE_2, InsnParser::FSTORE_3, InsnParser::FSTORE),
+						OpType::Double => (InsnParser::DSTORE_0, InsnParser::DSTORE_1, InsnParser::DSTORE_2, InsnParser::DSTORE_3, InsnParser::DSTORE),
+						OpType::Long => (InsnParser::LSTORE_0, InsnParser::LSTORE_1, InsnParser::LSTORE_2, InsnParser::LSTORE_3, InsnParser::LSTORE),
+					};
+					match x.index {
+						0 => {
+							wtr.write_u8(op0)?;
+							pc = pc.checked_add(1)?;
+						}
+						1 => {
+							wtr.write_u8(op1)?;
+							pc = pc.checked_add(1)?;
+						}
+						2 => {
+							wtr.write_u8(op2)?;
+							pc = pc.checked_add(1)?;
+						}
+						3 => {
+							wtr.write_u8(op3)?;
+							pc = pc.checked_add(1)?;
+						}
+						index => {
+							if index <= 0xFF {
+								wtr.write_u8(opx)?;
+								wtr.write_u8(index as u8)?;
+								pc = pc.checked_add(2)?;
+							} else {
+								wtr.write_u8(InsnParser::WIDE)?;
+								wtr.write_u8(opx)?;
+								wtr.write_u16::<BigEndian>(index)?;
+								pc = pc.checked_add(4)?;
+							}
+						}
+					}
+				}
+				Insn::NewArray(x) => {
+					match &x.kind {
+						Type::Reference(x) => {
+							let cls = if let Some(cls) = x {
+								cls.clone()
+							} else {
+								// technically this should be invalid and we could throw an error
+								// but it's better to just assume the user wants an Object
+								String::from("java/lang/Object")
+							};
+							wtr.write_u8(InsnParser::ANEWARRAY)?;
+							wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(cls)))?;
+							pc = pc.checked_add(3)?;
+						}
+						Type::Primitive(x) => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							match x {
+								PrimitiveType::Boolean => wtr.write_u8(4)?,
+								PrimitiveType::Byte => wtr.write_u8(8)?,
+								PrimitiveType::Char => wtr.write_u8(5)?,
+								PrimitiveType::Short => wtr.write_u8(9)?,
+								PrimitiveType::Int => wtr.write_u8(10)?,
+								PrimitiveType::Long => wtr.write_u8(11)?,
+								PrimitiveType::Float => wtr.write_u8(6)?,
+								PrimitiveType::Double => wtr.write_u8(7)?,
+							}
+							pc = pc.checked_add(2)?;
+						}
+					}
+				}
+				Insn::Return(x) => {
+					match &x.kind {
+						ReturnType::Void => wtr.write_u8(InsnParser::RETURN)?,
+						ReturnType::Reference => wtr.write_u8(InsnParser::ARETURN)?,
+						// boolean, byte, char and short all use the int return (same size)
+						ReturnType::Boolean => wtr.write_u8(InsnParser::IRETURN)?,
+						ReturnType::Byte => wtr.write_u8(InsnParser::IRETURN)?,
+						ReturnType::Char => wtr.write_u8(InsnParser::IRETURN)?,
+						ReturnType::Short => wtr.write_u8(InsnParser::IRETURN)?,
+						ReturnType::Int => wtr.write_u8(InsnParser::IRETURN)?,
+						ReturnType::Long => wtr.write_u8(InsnParser::LRETURN)?,
+						ReturnType::Float => wtr.write_u8(InsnParser::FRETURN)?,
+						ReturnType::Double => wtr.write_u8(InsnParser::DRETURN)?,
+					}
+					pc = pc.checked_add(1)?;
+				}
+				Insn::ArrayLength(x) => {
+					wtr.write_u8(InsnParser::ARRAYLENGTH)?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Throw(x) => {
+					wtr.write_u8(InsnParser::ATHROW)?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::CheckCast(x) => {
+					wtr.write_u8(InsnParser::CHECKCAST)?;
+					wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(x.kind.clone())))?;
+					pc = pc.checked_add(3)?;
+				}
+				Insn::Convert(x) => {
+					match &x.from {
+						PrimitiveType::Short | PrimitiveType::Char | PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Int => {
+							wtr.write_u8(match &x.to {
+								PrimitiveType::Boolean | PrimitiveType::Byte => InsnParser::I2B,
+								PrimitiveType::Char => InsnParser::I2C,
+								PrimitiveType::Short => InsnParser::I2S,
+								PrimitiveType::Int => InsnParser::NOP,
+								PrimitiveType::Long => InsnParser::I2L,
+								PrimitiveType::Float => InsnParser::I2F,
+								PrimitiveType::Double => InsnParser::I2D
+							})?;
+							pc = pc.checked_add(1)?;
+						}
+						PrimitiveType::Long => {
+							wtr.write_u8(match &x.to {
+								PrimitiveType::Short | PrimitiveType::Char | PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Int => InsnParser::L2I,
+								PrimitiveType::Long => InsnParser::NOP,
+								PrimitiveType::Float => InsnParser::L2F,
+								PrimitiveType::Double => InsnParser::L2D
+							})?;
+							pc = pc.checked_add(1)?;
+						}
+						PrimitiveType::Float => {
+							wtr.write_u8(match &x.to {
+								PrimitiveType::Short | PrimitiveType::Char | PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Int => InsnParser::F2I,
+								PrimitiveType::Long => InsnParser::F2L,
+								PrimitiveType::Float => InsnParser::NOP,
+								PrimitiveType::Double => InsnParser::F2D
+							})?;
+							pc = pc.checked_add(1)?;
+						}
+						PrimitiveType::Double => {
+							wtr.write_u8(match &x.to {
+								PrimitiveType::Short | PrimitiveType::Char | PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Int => InsnParser::D2I,
+								PrimitiveType::Long => InsnParser::D2L,
+								PrimitiveType::Float => InsnParser::D2F,
+								PrimitiveType::Double => InsnParser::NOP
+							})?;
+							pc = pc.checked_add(1)?;
+						}
+					}
+				}
+				Insn::Add(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean => InsnParser::IADD,
+						PrimitiveType::Byte => InsnParser::IADD,
+						PrimitiveType::Char => InsnParser::IADD,
+						PrimitiveType::Short => InsnParser::IADD,
+						PrimitiveType::Int => InsnParser::IADD,
+						PrimitiveType::Long => InsnParser::LADD,
+						PrimitiveType::Float => InsnParser::FADD,
+						PrimitiveType::Double => InsnParser::DADD
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Compare(x) => {
+					match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => {
+							// there's no int comparison opcode, but we can use long comparison
+							wtr.write_u8(InsnParser::I2L)?;
+							wtr.write_u8(InsnParser::LCMP)?;
+							pc = pc.checked_add(2)?;
+						}
+						PrimitiveType::Long => {
+							wtr.write_u8(InsnParser::LCMP)?;
+							pc = pc.checked_add(1)?;
+						}
+						PrimitiveType::Float => {
+							wtr.write_u8(if x.pos_on_nan { InsnParser::FCMPG } else { InsnParser::FCMPL })?;
+							pc = pc.checked_add(1)?;
+						}
+						PrimitiveType::Double => {
+							wtr.write_u8(if x.pos_on_nan { InsnParser::DCMPG } else { InsnParser::DCMPL })?;
+							pc = pc.checked_add(1)?;
+						}
+					}
+				}
+				Insn::Divide(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => InsnParser::IDIV,
+						PrimitiveType::Long => InsnParser::LDIV,
+						PrimitiveType::Float => InsnParser::FDIV,
+						PrimitiveType::Double => InsnParser::DDIV
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Multiply(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => InsnParser::IMUL,
+						PrimitiveType::Long => InsnParser::LMUL,
+						PrimitiveType::Float => InsnParser::FMUL,
+						PrimitiveType::Double => InsnParser::DMUL
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Negate(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => InsnParser::INEG,
+						PrimitiveType::Long => InsnParser::LNEG,
+						PrimitiveType::Float => InsnParser::FNEG,
+						PrimitiveType::Double => InsnParser::DNEG
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Remainder(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => InsnParser::IREM,
+						PrimitiveType::Long => InsnParser::LREM,
+						PrimitiveType::Float => InsnParser::FREM,
+						PrimitiveType::Double => InsnParser::DREM
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::Subtract(x) => {
+					wtr.write_u8(match &x.kind {
+						PrimitiveType::Boolean | PrimitiveType::Byte | PrimitiveType::Char | PrimitiveType::Short | PrimitiveType::Int => InsnParser::ISUB,
+						PrimitiveType::Long => InsnParser::LSUB,
+						PrimitiveType::Float => InsnParser::FSUB,
+						PrimitiveType::Double => InsnParser::DSUB
+					})?;
+					pc = pc.checked_add(1)?;
+				}
+				Insn::And(x) => {
+				}
+				Insn::Or(_) => {}
+				Insn::Xor(_) => {}
+				Insn::ShiftLeft(_) => {}
+				Insn::ShiftRight(_) => {}
+				Insn::LogicalShiftRight(_) => {}
+				Insn::Dup(_) => {}
+				Insn::Pop(_) => {}
+				Insn::GetField(_) => {}
+				Insn::PutField(_) => {}
+				Insn::Jump(_) => {}
+				Insn::ConditionalJump(_) => {}
+				Insn::IncrementInt(_) => {}
+				Insn::InstanceOf(_) => {}
+				Insn::InvokeDynamic(_) => {}
+				Insn::Invoke(_) => {}
+				Insn::LookupSwitch(_) => {}
+				Insn::TableSwitch(_) => {}
+				Insn::MonitorEnter(_) => {}
+				Insn::MonitorExit(_) => {}
+				Insn::MultiNewArray(_) => {}
+				Insn::NewObject(_) => {}
+				Insn::Nop(_) => {}
+				Insn::Swap(_) => {}
+				Insn::ImpDep1(_) => {}
+				Insn::ImpDep2(_) => {}
+				Insn::BreakPoint(_) => {}
+			}
+		}
+		
+		Ok(())
+	}
+	
+	fn write_ldc<T: Write>(wtr: &mut T, constant: u16, double_size: bool) -> Result<u32> {
+		// double sized constants must use LDC2 (only wide varient exists)
+		if double_size {
+			wtr.write_u8(InsnParser::LDC2_W)?;
+			wtr.write_u16::<BigEndian>(constant)?;
+			Ok(5)
+		} else {
+			// If we can fit the constant index into a u8 then use LDC otherwise use LDC_W
+			if constant <= 0xFF {
+				wtr.write_u8(InsnParser::LDC);
+				wtr.write_u8(constant as u8)?;
+				Ok(3)
+			} else {
+				wtr.write_u8(InsnParser::LDC_W);
+				wtr.write_u16::<BigEndian>(constant)?;
+				Ok(5)
+			}
+		}
 	}
 }

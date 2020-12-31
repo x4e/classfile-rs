@@ -4,7 +4,7 @@ use crate::constantpool::{ConstantPool, ConstantPoolWriter};
 use crate::attributes::{Attributes, Attribute, AttributeSource, SignatureAttribute};
 use crate::version::ClassVersion;
 use crate::error::Result;
-use crate::utils::{mut_retain, remove_first, replace_first, VecUtils};
+use crate::utils::{VecUtils};
 use std::io::{Read, Write};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 
@@ -47,7 +47,7 @@ impl Field {
 		let access_flags = FieldAccessFlags::parse(rdr)?;
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		let mut attributes = Attributes::parse(rdr, AttributeSource::Field, version, constant_pool)?;
+		let attributes = Attributes::parse(rdr, AttributeSource::Field, version, constant_pool)?;
 		
 		Ok(Field {
 			access_flags,
@@ -57,10 +57,10 @@ impl Field {
 		})
 	}
 	
-	pub fn signature(&self) -> Option<String> {
-		for attr in self.attributes.iter() {
+	pub fn signature(&mut self) -> Option<&mut String> {
+		for attr in self.attributes.iter_mut() {
 			if let Attribute::Signature(sig) = attr {
-				return Some(sig.signature.clone())
+				return Some(&mut sig.signature)
 			}
 		}
 		return None
@@ -69,31 +69,26 @@ impl Field {
 	pub fn set_signature(&mut self, sig: Option<String>) {
 		// According to the JVM spec there must be at most one signature attribute in the attributes table
 		// first find the index of the existing sig
-		let mut index = self.attributes.find_first(|attr| {
+		let index = self.attributes.find_first(|attr| {
 			if let Attribute::Signature(_) = attr { true } else { false }
 		});
-		match sig {
-			Some(sig) => {
-				let attr = Attribute::Signature(SignatureAttribute::new(sig.clone()));
-				if let Some(index) = index {
-					self.attributes.replace(index, attr)
-				} else {
-					self.attributes.push(attr)
-				}
+		if let Some(sig) = sig {
+			let attr = Attribute::Signature(SignatureAttribute::new(sig.clone()));
+			if let Some(index) = index {
+				self.attributes.replace(index, attr);
+			} else {
+				self.attributes.push(attr);
 			}
-			None => {
-				if let Some(index) = index {
-					self.attributes.remove(index);
-				}
-			}
-		};
+		} else if let Some(index) = index {
+			self.attributes.remove(index);
+		}
 	}
 	
 	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		self.access_flags.write(wtr)?;
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
-		Attributes::write_with_extra(wtr, &self.attributes, extra, constant_pool)?;
+		Attributes::write(wtr, &self.attributes, constant_pool)?;
 		Ok(())
 	}
 }

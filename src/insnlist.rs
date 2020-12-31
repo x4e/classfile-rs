@@ -1,5 +1,6 @@
 use crate::ast::{Insn, LabelInsn};
 use std::fmt::{Debug, Formatter,};
+use std::slice::Iter;
 
 #[derive(Clone, PartialEq)]
 pub struct InsnList {
@@ -23,11 +24,15 @@ impl InsnList {
 		}
 	}
 	
-	/// The givien label will be valid for the lifetime of this list
+	/// The given label will be valid for the lifetime of this list
 	pub fn new_label(&mut self) -> LabelInsn {
 		let id = self.labels;
 		self.labels += 1;
 		LabelInsn::new(id)
+	}
+	
+	pub fn iter(&mut self) -> Iter<'_, Insn> {
+		self.insns.iter()
 	}
 }
 

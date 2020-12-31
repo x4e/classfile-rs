@@ -11,15 +11,15 @@ pub trait VecUtils <T> {
 }
 
 impl <T> VecUtils<T> for Vec<T> {
-	fn replace<T>(&mut self, index: usize, item: T) -> Option<T> {
-		let v = &mut **self;
+	fn replace(&mut self, index: usize, item: T) -> Option<T> {
 		if index >= self.len() {
 			return None;
 		}
+		let v = &mut **self;
 		Some(std::mem::replace(&mut v[index], item))
 	}
 	
-	fn find_first<F>(&self, op: F) -> Option<usize> where
+	fn find_first<F>(&self, mut op: F) -> Option<usize> where
 		F: FnMut(&T) -> bool {
 		let mut i = 0usize;
 		for attr in self.iter() {

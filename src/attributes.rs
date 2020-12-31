@@ -1,9 +1,10 @@
 use crate::constantpool::{ConstantPool, ConstantType, ConstantPoolWriter};
-use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use std::io::{Write, Read};
 use crate::version::{MajorVersion, ClassVersion};
 use crate::code::CodeAttribute;
 use crate::error::Result;
+use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
+use std::io::{Write, Read};
+use derive_more::Constructor;
 
 #[allow(non_snake_case)]
 pub mod Attributes {
@@ -15,6 +16,7 @@ pub mod Attributes {
 	
 	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Attribute>> {
 		let num_attributes = rdr.read_u16::<BigEndian>()? as usize;
+		println!("num_attributes {:#x?}", num_attributes);
 		let mut attributes: Vec<Attribute> = Vec::with_capacity(num_attributes);
 		for _ in 0..num_attributes {
 			attributes.push(Attribute::parse(rdr, &source, version, constant_pool)?);
@@ -143,10 +145,25 @@ impl ExceptionsAttribute {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct UnknownAttribute {
 	pub name: String,
 	pub buf: Vec<u8>
+}
+
+impl UnknownAttribute {
+	pub fn parse(name: String, buf: Vec<u8>) -> Result<Self> {
+		Ok(UnknownAttribute::new(name, buf))
+	}
+	
+	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+		wtr.write_all(self.buf.as_slice())?;
+		Ok(())
+	}
+	
+	pub fn len(&self) -> usize {
+		self.buf.len()
+	}
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -171,21 +188,6 @@ impl SourceFileAttribute {
 	}
 }
 
-impl UnknownAttribute {
-	pub fn parse(name: String, buf: Vec<u8>) -> Result<Self> {
-		Ok(UnknownAttribute {
-			name, buf
-		})
-	}
-	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(0)?; // write name
-		wtr.write_u32::<BigEndian>(self.buf.len() as u32)?; // length
-		wtr.write_all(self.buf.as_slice())?;
-		Ok(())
-	}
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Attribute {
 	ConstantValue(ConstantValueAttribute),
@@ -199,12 +201,13 @@ pub enum Attribute {
 impl Attribute {
 	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Attribute> {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
+		println!("Parsing: {:#x?}", name);
 		let attribute_length = rdr.read_u32::<BigEndian>()? as usize;
 		let mut buf: Vec<u8> = Vec::with_capacity(attribute_length);
 		rdr.take(attribute_length as u64).read_to_end(&mut buf)?;
 		let str = name.as_str();
 		
-		Ok(match source {
+		let attr = match source {
 			AttributeSource::Class => {
 				if str == "SourceFile" {
 					Attribute::SourceFile(SourceFileAttribute::parse(constant_pool, buf)?)
@@ -235,18 +238,55 @@ impl Attribute {
 			AttributeSource::Code => {
 				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 			}
-		})
+		};
+		println!("{:#x?}", attr);
+		Ok(attr)
 	}
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		match self {
-			Attribute::ConstantValue(t) => t.write(wtr, constant_pool),
-			Attribute::Signature(t) => t.write(wtr, constant_pool),
-			Attribute::Code(t) => t.write(wtr, constant_pool),
-			Attribute::Exceptions(t) => t.write(wtr, constant_pool),
-			Attribute::SourceFile(t) => t.write(wtr, constant_pool),
-			Attribute::Unknown(t) => t.write(wtr, constant_pool)
-		}
+			Attribute::ConstantValue(t) => {
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("ConstantValue"))?;
+				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::Signature(t) => {
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("Signature"))?;
+				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::Code(t) => {
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("Code"))?;
+				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::Exceptions(t) => {
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("Exceptions"))?;
+				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::SourceFile(t) => {
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("SourceFile"))?;
+				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::Unknown(t) => {
+				wtr.write_u16::<BigEndian>(constant_pool.utf8(t.name.clone()))?;
+				wtr.write_u32::<BigEndian>(t.len() as u32)?;
+				t.write(wtr, constant_pool)?;
+			}
+		};
+		Ok(())
 	}
 }
 

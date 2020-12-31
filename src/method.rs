@@ -4,7 +4,7 @@ use crate::version::ClassVersion;
 use crate::constantpool::{ConstantPool, ConstantPoolWriter};
 use crate::Serializable;
 use crate::error::Result;
-use crate::utils::{mut_retain};
+use crate::utils::{VecUtils};
 use crate::code::CodeAttribute;
 use std::io::{Read, Write};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -40,9 +40,6 @@ pub struct Method {
 	pub access_flags: MethodAccessFlags,
 	pub name: String,
 	pub descriptor: String,
-	pub signature: Option<String>,
-	pub exceptions: Vec<String>,
-	pub code: Option<CodeAttribute>,
 	pub attributes: Vec<Attribute>
 }
 
@@ -50,47 +47,95 @@ impl Method {
 	pub fn parse<R: Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Self> {
 		let access_flags = MethodAccessFlags::parse(rdr)?;
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
+		println!("name: {:#x?}", name);
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		let mut signature: Option<String> = None;
-		#[allow(invalid_value)]
-		let mut exceptions: Vec<String> = Vec::new();
-		let mut code: Option<CodeAttribute> = None;
-		let mut attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
+		println!("desc: {:#x?}", descriptor);
 		
-		mut_retain(&mut attributes, |attribute| {
-			match attribute {
-				Attribute::Signature(signature_attr) => {
-					// The attribute will be dropped, so instead of cloning we can swap an empty string for the signature
-					let mut rep = String::with_capacity(0);
-					std::mem::swap(&mut rep, &mut signature_attr.signature);
-					signature = Some(rep);
-					false
-				},
-				Attribute::Exceptions(exceptions_attr) => {
-					std::mem::swap(&mut exceptions, &mut exceptions_attr.exceptions);
-					false
-				},
-				Attribute::Code(code_attr) => {
-					let mut rep: CodeAttribute = CodeAttribute::empty();
-					std::mem::swap(&mut rep, code_attr);
-					code = Some(rep);
-					false
-				}
-				_ => true
-			}
-		});
+		let attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
 		
 		let meth = Method {
 			access_flags,
 			name,
 			descriptor,
-			signature,
-			exceptions,
-			code,
 			attributes
 		};
 		println!("{:#x?}", meth);
 		Ok(meth)
+	}
+	
+	pub fn signature(&mut self) -> Option<&mut String> {
+		for attr in self.attributes.iter_mut() {
+			if let Attribute::Signature(sig) = attr {
+				return Some(&mut sig.signature)
+			}
+		}
+		return None
+	}
+	
+	pub fn set_signature(&mut self, sig: Option<String>) {
+		let index = self.attributes.find_first(|attr| {
+			if let Attribute::Signature(_) = attr { true } else { false }
+		});
+		if let Some(sig) = sig {
+			let attr = Attribute::Signature(SignatureAttribute::new(sig.clone()));
+			if let Some(index) = index {
+				self.attributes.replace(index, attr);
+			} else {
+				self.attributes.push(attr);
+			}
+		} else if let Some(index) = index {
+			self.attributes.remove(index);
+		}
+	}
+	
+	pub fn exceptions(&mut self) -> Option<&mut Vec<String>> {
+		for attr in self.attributes.iter_mut() {
+			if let Attribute::Exceptions(x) = attr {
+				return Some(&mut x.exceptions)
+			}
+		}
+		return None
+	}
+	
+	pub fn set_exceptions(&mut self, exc: Option<Vec<String>>) {
+		let index = self.attributes.find_first(|attr| {
+			if let Attribute::Exceptions(_) = attr { true } else { false }
+		});
+		if let Some(exc) = exc {
+			let attr = Attribute::Exceptions(ExceptionsAttribute::new(exc.clone()));
+			if let Some(index) = index {
+				self.attributes.replace(index, attr);
+			} else {
+				self.attributes.push(attr);
+			}
+		} else if let Some(index) = index {
+			self.attributes.remove(index);
+		}
+	}
+	
+	pub fn code(&mut self) -> Option<&mut CodeAttribute> {
+		for attr in self.attributes.iter_mut() {
+			if let Attribute::Code(x) = attr {
+				return Some(x)
+			}
+		}
+		return None
+	}
+	
+	pub fn set_code(&mut self, code: Option<CodeAttribute>) {
+		let index = self.attributes.find_first(|attr| {
+			if let Attribute::Code(_) = attr { true } else { false }
+		});
+		if let Some(code) = code {
+			let attr = Attribute::Code(code);
+			if let Some(index) = index {
+				self.attributes.replace(index, attr);
+			} else {
+				self.attributes.push(attr);
+			}
+		} else if let Some(index) = index {
+			self.attributes.remove(index);
+		}
 	}
 	
 	pub fn write<W: Write>(&self, wtr: &mut W, constant_pool: &mut ConstantPoolWriter) -> Result<()> {

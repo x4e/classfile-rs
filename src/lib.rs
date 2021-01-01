@@ -59,7 +59,7 @@ mod tests {
 	
 	#[test]
 	fn test_classes() -> Result<()> {
-		walk("classes/benchmarking/", &|entry| {
+		/*walk("classes/benchmarking/", &|entry| {
 			let path = entry.path();
 			if path.is_file() {
 				let extension = path.extension().unwrap().to_str().unwrap();
@@ -68,7 +68,7 @@ mod tests {
 				}
 			}
 			Ok(())
-		})?;
+		})?;*/
 		walk("classes/testing/", &|entry| {
 			let path = entry.path();
 			if path.is_file() {

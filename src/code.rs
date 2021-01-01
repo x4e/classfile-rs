@@ -1431,8 +1431,24 @@ impl InsnParser {
 					})?;
 					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
-				Insn::GetField(_) => {}
-				Insn::PutField(_) => {}
+				Insn::GetField(x) => {
+					wtr.write_u8(if x.instance { InsnParser::GETFIELD } else { InsnParser::GETSTATIC })?;
+					let class_ref = constant_pool.class_utf8(x.class.clone());
+					let name_ref = constant_pool.utf8(x.name.clone());
+					let desc_ref = constant_pool.utf8(x.descriptor.clone());
+					let nametype_ref = constant_pool.nameandtype(name_ref, desc_ref);
+					wtr.write_u16::<BigEndian>(constant_pool.fieldref(class_ref, nametype_ref))?;
+					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::PutField(x) => {
+					wtr.write_u8(if x.instance { InsnParser::PUTFIELD } else { InsnParser::PUTSTATIC })?;
+					let class_ref = constant_pool.class_utf8(x.class.clone());
+					let name_ref = constant_pool.utf8(x.name.clone());
+					let desc_ref = constant_pool.utf8(x.descriptor.clone());
+					let nametype_ref = constant_pool.nameandtype(name_ref, desc_ref);
+					wtr.write_u16::<BigEndian>(constant_pool.fieldref(class_ref, nametype_ref))?;
+					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
 				Insn::Jump(_) => {}
 				Insn::ConditionalJump(_) => {}
 				Insn::IncrementInt(_) => {}

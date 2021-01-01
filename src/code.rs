@@ -358,16 +358,16 @@ impl InsnParser {
 				InsnParser::ASTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Reference, 3)),
 				InsnParser::ATHROW => Insn::Throw(ThrowInsn::new()),
 				// BALOAD is both byte and boolean (they are same size on hotspot) we will assume byte
-				InsnParser::BALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Byte))),
-				InsnParser::BASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Byte))),
+				InsnParser::BALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Byte)),
+				InsnParser::BASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Byte)),
 				InsnParser::BIPUSH => {
 					let byte = rdr.read_i8()?;
 					pc += 1;
 					Insn::Ldc(LdcInsn::new(LdcType::Int(byte as i32)))
 				},
 				InsnParser::BREAKPOINT => Insn::BreakPoint(BreakPointInsn::new()),
-				InsnParser::CALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Char))),
-				InsnParser::CASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Char))),
+				InsnParser::CALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Char)),
+				InsnParser::CASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Char)),
 				InsnParser::CHECKCAST => {
 					let kind = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
 					pc += 2;
@@ -377,8 +377,8 @@ impl InsnParser {
 				InsnParser::D2I => Insn::Convert(ConvertInsn::new(PrimitiveType::Double, PrimitiveType::Int)),
 				InsnParser::D2L => Insn::Convert(ConvertInsn::new(PrimitiveType::Double, PrimitiveType::Long)),
 				InsnParser::DADD => Insn::Add(AddInsn::new(PrimitiveType::Double)),
-				InsnParser::DALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Double))),
-				InsnParser::DASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Double))),
+				InsnParser::DALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Double)),
+				InsnParser::DASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Double)),
 				InsnParser::DCMPG => Insn::Compare(CompareInsn::new(PrimitiveType::Double, true)),
 				InsnParser::DCMPL => Insn::Compare(CompareInsn::new(PrimitiveType::Double, false)),
 				InsnParser::DCONST_0 => Insn::Ldc(LdcInsn::new(LdcType::Double(0f64))),
@@ -417,8 +417,8 @@ impl InsnParser {
 				InsnParser::F2I => Insn::Convert(ConvertInsn::new(PrimitiveType::Float, PrimitiveType::Int)),
 				InsnParser::F2L => Insn::Convert(ConvertInsn::new(PrimitiveType::Float, PrimitiveType::Long)),
 				InsnParser::FADD => Insn::Add(AddInsn::new(PrimitiveType::Float)),
-				InsnParser::FALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Float))),
-				InsnParser::FASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Float))),
+				InsnParser::FALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Float)),
+				InsnParser::FASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Float)),
 				InsnParser::FCMPG => Insn::Compare(CompareInsn::new(PrimitiveType::Float, true)),
 				InsnParser::FCMPL => Insn::Compare(CompareInsn::new(PrimitiveType::Float, false)),
 				InsnParser::FCONST_0 => Insn::Ldc(LdcInsn::new(LdcType::Float(0f32))),
@@ -485,9 +485,9 @@ impl InsnParser {
 				InsnParser::I2L => Insn::Convert(ConvertInsn::new(PrimitiveType::Int, PrimitiveType::Long)),
 				InsnParser::I2S => Insn::Convert(ConvertInsn::new(PrimitiveType::Int, PrimitiveType::Short)),
 				InsnParser::IADD => Insn::Add(AddInsn::new(PrimitiveType::Int)),
-				InsnParser::IALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Int))),
-				InsnParser::IAND => Insn::And(AndInsn::new(PrimitiveType::Int)),
-				InsnParser::IASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Int))),
+				InsnParser::IALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Int)),
+				InsnParser::IAND => Insn::And(AndInsn::new(IntegerType::Int)),
+				InsnParser::IASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Int)),
 				InsnParser::ICONST_M1 => Insn::Ldc(LdcInsn::new(LdcType::Int(-1))),
 				InsnParser::ICONST_0 => Insn::Ldc(LdcInsn::new(LdcType::Int(0))),
 				InsnParser::ICONST_1 => Insn::Ldc(LdcInsn::new(LdcType::Int(1))),
@@ -675,11 +675,11 @@ impl InsnParser {
 					
 					Insn::Invoke(InvokeInsn::new(InvokeType::Instance, class, name, descriptor, interface_method))
 				},
-				InsnParser::IOR => Insn::Or(OrInsn::new(PrimitiveType::Int)),
+				InsnParser::IOR => Insn::Or(OrInsn::new(IntegerType::Int)),
 				InsnParser::IREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Int)),
 				InsnParser::IRETURN => Insn::Return(ReturnInsn::new(ReturnType::Int)),
-				InsnParser::ISHL => Insn::ShiftLeft(ShiftLeftInsn::new(OpType::Int)),
-				InsnParser::ISHR => Insn::ShiftRight(ShiftRightInsn::new(OpType::Int)),
+				InsnParser::ISHL => Insn::ShiftLeft(ShiftLeftInsn::new(IntegerType::Int)),
+				InsnParser::ISHR => Insn::ShiftRight(ShiftRightInsn::new(IntegerType::Int)),
 				InsnParser::ISTORE => {
 					let index = rdr.read_u8()?;
 					pc += 1;
@@ -690,17 +690,17 @@ impl InsnParser {
 				InsnParser::ISTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Int, 2)),
 				InsnParser::ISTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Int, 3)),
 				InsnParser::ISUB => Insn::Subtract(SubtractInsn::new(PrimitiveType::Int)),
-				InsnParser::IUSHR => Insn::LogicalShiftRight(LogicalShiftRightInsn::new(OpType::Int)),
-				InsnParser::IXOR => Insn::Xor(XorInsn::new(PrimitiveType::Int)),
+				InsnParser::IUSHR => Insn::LogicalShiftRight(LogicalShiftRightInsn::new(IntegerType::Int)),
+				InsnParser::IXOR => Insn::Xor(XorInsn::new(IntegerType::Int)),
 				//InsnParser::JSR =>
 				//InsnParser::JSR_W =>
 				InsnParser::L2D => Insn::Convert(ConvertInsn::new(PrimitiveType::Long, PrimitiveType::Double)),
 				InsnParser::L2F => Insn::Convert(ConvertInsn::new(PrimitiveType::Long, PrimitiveType::Float)),
 				InsnParser::L2I => Insn::Convert(ConvertInsn::new(PrimitiveType::Long, PrimitiveType::Int)),
 				InsnParser::LADD => Insn::Add(AddInsn::new(PrimitiveType::Long)),
-				InsnParser::LALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Long))),
-				InsnParser::LAND => Insn::And(AndInsn::new(PrimitiveType::Long)),
-				InsnParser::LASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Long))),
+				InsnParser::LALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Long)),
+				InsnParser::LAND => Insn::And(AndInsn::new(IntegerType::Long)),
+				InsnParser::LASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Long)),
 				InsnParser::LCMP => Insn::Compare(CompareInsn::new(PrimitiveType::Long, false)),
 				InsnParser::LCONST_0 => Insn::Ldc(LdcInsn::new(LdcType::Long(0))),
 				InsnParser::LCONST_1 => Insn::Ldc(LdcInsn::new(LdcType::Long(1))),
@@ -753,11 +753,11 @@ impl InsnParser {
 						cases
 					})
 				}
-				InsnParser::LOR => Insn::Or(OrInsn::new(PrimitiveType::Long)),
+				InsnParser::LOR => Insn::Or(OrInsn::new(IntegerType::Long)),
 				InsnParser::LREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Long)),
 				InsnParser::LRETURN => Insn::Return(ReturnInsn::new(ReturnType::Long)),
-				InsnParser::LSHL => Insn::ShiftLeft(ShiftLeftInsn::new(OpType::Long)),
-				InsnParser::LSHR => Insn::ShiftRight(ShiftRightInsn::new(OpType::Long)),
+				InsnParser::LSHL => Insn::ShiftLeft(ShiftLeftInsn::new(IntegerType::Long)),
+				InsnParser::LSHR => Insn::ShiftRight(ShiftRightInsn::new(IntegerType::Long)),
 				InsnParser::LSTORE => {
 					let index = rdr.read_u8()?;
 					pc += 1;
@@ -768,8 +768,8 @@ impl InsnParser {
 				InsnParser::LSTORE_2 => Insn::LocalStore(LocalStoreInsn::new(OpType::Long, 2)),
 				InsnParser::LSTORE_3 => Insn::LocalStore(LocalStoreInsn::new(OpType::Long, 3)),
 				InsnParser::LSUB => Insn::Subtract(SubtractInsn::new(PrimitiveType::Long)),
-				InsnParser::LUSHR => Insn::LogicalShiftRight(LogicalShiftRightInsn::new(OpType::Long)),
-				InsnParser::LXOR => Insn::Xor(XorInsn::new(PrimitiveType::Long)),
+				InsnParser::LUSHR => Insn::LogicalShiftRight(LogicalShiftRightInsn::new(IntegerType::Long)),
+				InsnParser::LXOR => Insn::Xor(XorInsn::new(IntegerType::Long)),
 				InsnParser::MONITORENTER => Insn::MonitorEnter(MonitorEnterInsn::new()),
 				InsnParser::MONITOREXIT => Insn::MonitorExit(MonitorExitInsn::new()),
 				InsnParser::MULTIANEWARRAY => {
@@ -788,21 +788,21 @@ impl InsnParser {
 					let atype = rdr.read_u8()?;
 					pc += 1;
 					let kind = match atype {
-						4 => PrimitiveType::Boolean,
-						5 => PrimitiveType::Char,
-						6 => PrimitiveType::Float,
-						7 => PrimitiveType::Double,
-						8 => PrimitiveType::Byte,
-						9 => PrimitiveType::Short,
-						10 => PrimitiveType::Int,
-						11 => PrimitiveType::Long,
+						4 => Type::Boolean,
+						5 => Type::Char,
+						6 => Type::Float,
+						7 => Type::Double,
+						8 => Type::Byte,
+						9 => Type::Short,
+						10 => Type::Int,
+						11 => Type::Long,
 						_ => return Err(ParserError::other("Unknown Primitive Type"))
 					};
-					Insn::NewArray(NewArrayInsn::new(Type::Primitive(kind)))
+					Insn::NewArray(NewArrayInsn::new(kind))
 				},
 				InsnParser::NOP => Insn::Nop(NopInsn::new()),
-				InsnParser::POP => Insn::Pop(PopInsn::new(1)),
-				InsnParser::POP2 => Insn::Pop(PopInsn::new(2)),
+				InsnParser::POP => Insn::Pop(PopInsn::new(false)),
+				InsnParser::POP2 => Insn::Pop(PopInsn::new(true)),
 				InsnParser::PUTFIELD => {
 					let field_ref = constant_pool.fieldref(rdr.read_u16::<BigEndian>()?)?;
 					pc += 2;
@@ -823,8 +823,8 @@ impl InsnParser {
 				},
 				//InsnParser::RET =>
 				InsnParser::RETURN => Insn::Return(ReturnInsn::new(ReturnType::Void)),
-				InsnParser::SALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Primitive(PrimitiveType::Short))),
-				InsnParser::SASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Primitive(PrimitiveType::Short))),
+				InsnParser::SALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Short)),
+				InsnParser::SASTORE => Insn::ArrayStore(ArrayStoreInsn::new(Type::Short)),
 				InsnParser::SIPUSH => {
 					let short = rdr.read_i16::<BigEndian>()?;
 					pc += 2;
@@ -1018,40 +1018,30 @@ impl InsnParser {
 					label_pc_map.insert(x.clone(), pc);
 				}
 				Insn::ArrayLoad(x) => {
-					match &x.kind {
-						Type::Reference(x) => wtr.write_u8(InsnParser::AALOAD)?,
-						Type::Primitive(x) => {
-							match x {
-								PrimitiveType::Byte => wtr.write_u8(InsnParser::BALOAD)?,
-								PrimitiveType::Char => wtr.write_u8(InsnParser::CALOAD)?,
-								PrimitiveType::Short => wtr.write_u8(InsnParser::SALOAD)?,
-								PrimitiveType::Int => wtr.write_u8(InsnParser::IALOAD)?,
-								PrimitiveType::Long => wtr.write_u8(InsnParser::LALOAD)?,
-								PrimitiveType::Float => wtr.write_u8(InsnParser::FALOAD)?,
-								PrimitiveType::Double => wtr.write_u8(InsnParser::DALOAD)?,
-								PrimitiveType::Boolean => wtr.write_u8(InsnParser::BALOAD)?
-							}
-						}
-					}
-					pc = pc.checked_add(1)?;
+					wtr.write_u8(match &x.kind {
+						Type::Reference(x) => InsnParser::AALOAD,
+						Type::Byte | Type::Boolean => InsnParser::BALOAD,
+						Type::Char => InsnParser::CALOAD,
+						Type::Short => InsnParser::SALOAD,
+						Type::Int => InsnParser::IALOAD,
+						Type::Long => InsnParser::LALOAD,
+						Type::Float => InsnParser::FALOAD,
+						Type::Double => InsnParser::DALOAD
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::ArrayStore(x) => {
-					match &x.kind {
-						Type::Reference(x) => wtr.write_u8(InsnParser::AASTORE)?,
-						Type::Primitive(x) => {
-							match x {
-								PrimitiveType::Byte => wtr.write_u8(InsnParser::BASTORE)?,
-								PrimitiveType::Char => wtr.write_u8(InsnParser::CASTORE)?,
-								PrimitiveType::Short => wtr.write_u8(InsnParser::SASTORE)?,
-								PrimitiveType::Int => wtr.write_u8(InsnParser::IASTORE)?,
-								PrimitiveType::Long => wtr.write_u8(InsnParser::LASTORE)?,
-								PrimitiveType::Float => wtr.write_u8(InsnParser::FASTORE)?,
-								PrimitiveType::Double => wtr.write_u8(InsnParser::DASTORE)?,
-								PrimitiveType::Boolean => wtr.write_u8(InsnParser::BASTORE)?
-							}
-						}
-					}
-					pc = pc.checked_add(1)?;
+					wtr.write_u8(match &x.kind {
+						Type::Reference(x) => InsnParser::AASTORE,
+						Type::Byte | Type::Boolean => InsnParser::BASTORE,
+						Type::Char => InsnParser::CASTORE,
+						Type::Short => InsnParser::SASTORE,
+						Type::Int => InsnParser::IASTORE,
+						Type::Long => InsnParser::LASTORE,
+						Type::Float => InsnParser::FASTORE,
+						Type::Double => InsnParser::DASTORE
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Ldc(x) => {
 					pc = pc.checked_add(match &x.constant {
@@ -1060,7 +1050,7 @@ impl InsnParser {
 							1
 						}
 						LdcType::String(x) => {
-							InsnParser::write_ldc(wtr, constant_pool.string(constant_pool.utf8(x)), false)?
+							InsnParser::write_ldc(wtr, constant_pool.string_utf(x.clone()), false)?
 						}
 						LdcType::Int(x) => {
 							InsnParser::write_ldc(wtr, constant_pool.integer(*x), false)?
@@ -1075,19 +1065,19 @@ impl InsnParser {
 							InsnParser::write_ldc(wtr, constant_pool.double(*x), false)?
 						}
 						LdcType::Class(x) => {
-							InsnParser::write_ldc(wtr, constant_pool.class(constant_pool.utf8(x.clone())), false)?
+							InsnParser::write_ldc(wtr, constant_pool.class_utf8(x.clone()), false)?
 						}
 						LdcType::MethodType(x) => {
-							InsnParser::write_ldc(wtr, constant_pool.methodtype(constant_pool.utf8(x.clone())), false)?
+							InsnParser::write_ldc(wtr, constant_pool.methodtype_utf8(x.clone()), false)?
 						}
 						LdcType::MethodHandle() => return Err(ParserError::invalid_insn(pc, "MethodHandle LDC")),
 						LdcType::Dynamic() => return Err(ParserError::invalid_insn(pc, "Dynamic LDC")),
-					})?;
+					}).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::LocalLoad(x) => {
 					let (op0, op1, op2, op3, opx) = match &x.kind {
 						OpType::Reference => (InsnParser::ALOAD_0, InsnParser::ALOAD_1, InsnParser::ALOAD_2, InsnParser::ALOAD_3, InsnParser::ALOAD),
-						OpType::Int => (InsnParser::ILOAD_0, InsnParser::ILOAD_1, InsnParser::ILOAD_2, InsnParser::ILOAD_3, InsnParser::ILOAD),
+						OpType::Short | OpType::Char | OpType::Byte | OpType::Boolean | OpType::Int => (InsnParser::ILOAD_0, InsnParser::ILOAD_1, InsnParser::ILOAD_2, InsnParser::ILOAD_3, InsnParser::ILOAD),
 						OpType::Float => (InsnParser::FLOAD_0, InsnParser::FLOAD_1, InsnParser::FLOAD_2, InsnParser::FLOAD_3, InsnParser::FLOAD),
 						OpType::Double => (InsnParser::DLOAD_0, InsnParser::DLOAD_1, InsnParser::DLOAD_2, InsnParser::DLOAD_3, InsnParser::DLOAD),
 						OpType::Long => (InsnParser::LLOAD_0, InsnParser::LLOAD_1, InsnParser::LLOAD_2, InsnParser::LLOAD_3, InsnParser::LLOAD),
@@ -1095,30 +1085,30 @@ impl InsnParser {
 					match x.index {
 						0 => {
 							wtr.write_u8(op0)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						1 => {
 							wtr.write_u8(op1)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						2 => {
 							wtr.write_u8(op2)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						3 => {
 							wtr.write_u8(op3)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						index => {
 							if index <= 0xFF {
 								wtr.write_u8(opx)?;
 								wtr.write_u8(index as u8)?;
-								pc = pc.checked_add(2)?;
+								pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
 							} else {
 								wtr.write_u8(InsnParser::WIDE)?;
 								wtr.write_u8(opx)?;
 								wtr.write_u16::<BigEndian>(index)?;
-								pc = pc.checked_add(4)?;
+								pc = pc.checked_add(4).ok_or_else(|| ParserError::too_many_instructions())?;
 							}
 						}
 					}
@@ -1126,38 +1116,38 @@ impl InsnParser {
 				Insn::LocalStore(x) => {
 					let (op0, op1, op2, op3, opx) = match &x.kind {
 						OpType::Reference => (InsnParser::ASTORE_0, InsnParser::ASTORE_1, InsnParser::ASTORE_2, InsnParser::ASTORE_3, InsnParser::ASTORE),
-						OpType::Int => (InsnParser::ISTORE_0, InsnParser::ISTORE_1, InsnParser::ISTORE_2, InsnParser::ISTORE_3, InsnParser::ISTORE),
+						OpType::Boolean | OpType::Byte | OpType::Char | OpType::Short | OpType::Int => (InsnParser::ISTORE_0, InsnParser::ISTORE_1, InsnParser::ISTORE_2, InsnParser::ISTORE_3, InsnParser::ISTORE),
 						OpType::Float => (InsnParser::FSTORE_0, InsnParser::FSTORE_1, InsnParser::FSTORE_2, InsnParser::FSTORE_3, InsnParser::FSTORE),
 						OpType::Double => (InsnParser::DSTORE_0, InsnParser::DSTORE_1, InsnParser::DSTORE_2, InsnParser::DSTORE_3, InsnParser::DSTORE),
-						OpType::Long => (InsnParser::LSTORE_0, InsnParser::LSTORE_1, InsnParser::LSTORE_2, InsnParser::LSTORE_3, InsnParser::LSTORE),
+						OpType::Long => (InsnParser::LSTORE_0, InsnParser::LSTORE_1, InsnParser::LSTORE_2, InsnParser::LSTORE_3, InsnParser::LSTORE)
 					};
 					match x.index {
 						0 => {
 							wtr.write_u8(op0)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						1 => {
 							wtr.write_u8(op1)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						2 => {
 							wtr.write_u8(op2)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						3 => {
 							wtr.write_u8(op3)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						index => {
 							if index <= 0xFF {
 								wtr.write_u8(opx)?;
 								wtr.write_u8(index as u8)?;
-								pc = pc.checked_add(2)?;
+								pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
 							} else {
 								wtr.write_u8(InsnParser::WIDE)?;
 								wtr.write_u8(opx)?;
 								wtr.write_u16::<BigEndian>(index)?;
-								pc = pc.checked_add(4)?;
+								pc = pc.checked_add(4).ok_or_else(|| ParserError::too_many_instructions())?;
 							}
 						}
 					}
@@ -1173,22 +1163,48 @@ impl InsnParser {
 								String::from("java/lang/Object")
 							};
 							wtr.write_u8(InsnParser::ANEWARRAY)?;
-							wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(cls)))?;
-							pc = pc.checked_add(3)?;
+							wtr.write_u16::<BigEndian>(constant_pool.class_utf8(cls))?;
+							pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
-						Type::Primitive(x) => {
+						Type::Boolean => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
-							match x {
-								PrimitiveType::Boolean => wtr.write_u8(4)?,
-								PrimitiveType::Byte => wtr.write_u8(8)?,
-								PrimitiveType::Char => wtr.write_u8(5)?,
-								PrimitiveType::Short => wtr.write_u8(9)?,
-								PrimitiveType::Int => wtr.write_u8(10)?,
-								PrimitiveType::Long => wtr.write_u8(11)?,
-								PrimitiveType::Float => wtr.write_u8(6)?,
-								PrimitiveType::Double => wtr.write_u8(7)?,
-							}
-							pc = pc.checked_add(2)?;
+							wtr.write_u8(4)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Byte => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(8)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Char => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(5)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Short => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(9)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Int => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(10)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Long => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(11)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Float => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(6)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+						}
+						Type::Double => {
+							wtr.write_u8(InsnParser::NEWARRAY)?;
+							wtr.write_u8(7)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 					}
 				}
@@ -1206,20 +1222,20 @@ impl InsnParser {
 						ReturnType::Float => wtr.write_u8(InsnParser::FRETURN)?,
 						ReturnType::Double => wtr.write_u8(InsnParser::DRETURN)?,
 					}
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::ArrayLength(x) => {
 					wtr.write_u8(InsnParser::ARRAYLENGTH)?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Throw(x) => {
 					wtr.write_u8(InsnParser::ATHROW)?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::CheckCast(x) => {
 					wtr.write_u8(InsnParser::CHECKCAST)?;
-					wtr.write_u16::<BigEndian>(constant_pool.class(constant_pool.utf8(x.kind.clone())))?;
-					pc = pc.checked_add(3)?;
+					wtr.write_u16::<BigEndian>(constant_pool.class_utf8(x.kind.clone()))?;
+					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Convert(x) => {
 					match &x.from {
@@ -1233,7 +1249,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::I2F,
 								PrimitiveType::Double => InsnParser::I2D
 							})?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Long => {
 							wtr.write_u8(match &x.to {
@@ -1242,7 +1258,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::L2F,
 								PrimitiveType::Double => InsnParser::L2D
 							})?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Float => {
 							wtr.write_u8(match &x.to {
@@ -1251,7 +1267,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::NOP,
 								PrimitiveType::Double => InsnParser::F2D
 							})?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Double => {
 							wtr.write_u8(match &x.to {
@@ -1260,7 +1276,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::D2F,
 								PrimitiveType::Double => InsnParser::NOP
 							})?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 					}
 				}
@@ -1275,7 +1291,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FADD,
 						PrimitiveType::Double => InsnParser::DADD
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Compare(x) => {
 					match &x.kind {
@@ -1283,19 +1299,19 @@ impl InsnParser {
 							// there's no int comparison opcode, but we can use long comparison
 							wtr.write_u8(InsnParser::I2L)?;
 							wtr.write_u8(InsnParser::LCMP)?;
-							pc = pc.checked_add(2)?;
+							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Long => {
 							wtr.write_u8(InsnParser::LCMP)?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Float => {
 							wtr.write_u8(if x.pos_on_nan { InsnParser::FCMPG } else { InsnParser::FCMPL })?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 						PrimitiveType::Double => {
 							wtr.write_u8(if x.pos_on_nan { InsnParser::DCMPG } else { InsnParser::DCMPL })?;
-							pc = pc.checked_add(1)?;
+							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 						}
 					}
 				}
@@ -1306,7 +1322,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FDIV,
 						PrimitiveType::Double => InsnParser::DDIV
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Multiply(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1315,7 +1331,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FMUL,
 						PrimitiveType::Double => InsnParser::DMUL
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Negate(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1324,7 +1340,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FNEG,
 						PrimitiveType::Double => InsnParser::DNEG
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Remainder(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1333,7 +1349,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FREM,
 						PrimitiveType::Double => InsnParser::DREM
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::Subtract(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1342,17 +1358,79 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FSUB,
 						PrimitiveType::Double => InsnParser::DSUB
 					})?;
-					pc = pc.checked_add(1)?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
 				Insn::And(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::IAND,
+						IntegerType::Long => InsnParser::LAND
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
 				}
-				Insn::Or(_) => {}
-				Insn::Xor(_) => {}
-				Insn::ShiftLeft(_) => {}
-				Insn::ShiftRight(_) => {}
-				Insn::LogicalShiftRight(_) => {}
-				Insn::Dup(_) => {}
-				Insn::Pop(_) => {}
+				Insn::Or(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::IOR,
+						IntegerType::Long => InsnParser::LOR
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::Xor(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::IXOR,
+						IntegerType::Long => InsnParser::LXOR
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::ShiftLeft(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::ISHL,
+						IntegerType::Long => InsnParser::LSHL
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::ShiftRight(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::ISHR,
+						IntegerType::Long => InsnParser::LSHR
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::LogicalShiftRight(x) => {
+					wtr.write_u8(match &x.kind {
+						IntegerType::Int => InsnParser::IUSHR,
+						IntegerType::Long => InsnParser::LUSHR
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::Dup(x) => {
+					wtr.write_u8(match x.num {
+						1 => {
+							match x.down {
+								0 => InsnParser::DUP,
+								1 => InsnParser::DUP_X1,
+								2 => InsnParser::DUP_X2,
+								_ => return Err(ParserError::invalid_insn(pc, "DupInsn::down must not be larger than 2"))
+							}
+						}
+						2 => {
+							match x.down {
+								0 => InsnParser::DUP2,
+								1 => InsnParser::DUP2_X1,
+								2 => InsnParser::DUP2_X2,
+								_ => return Err(ParserError::invalid_insn(pc, "DupInsn::down must not be larger than 2"))
+							}
+						}
+						_ => return Err(ParserError::invalid_insn(pc, "DupInsn::num must be in the range 1-2"))
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
+				Insn::Pop(x) => {
+					wtr.write_u8(match x.pop_two {
+						false => InsnParser::POP,
+						true => InsnParser::POP2,
+					})?;
+					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+				}
 				Insn::GetField(_) => {}
 				Insn::PutField(_) => {}
 				Insn::Jump(_) => {}
@@ -1379,7 +1457,7 @@ impl InsnParser {
 	}
 	
 	fn write_ldc<T: Write>(wtr: &mut T, constant: u16, double_size: bool) -> Result<u32> {
-		// double sized constants must use LDC2 (only wide varient exists)
+		// double sized constants must use LDC2 (only wide variant exists)
 		if double_size {
 			wtr.write_u8(InsnParser::LDC2_W)?;
 			wtr.write_u16::<BigEndian>(constant)?;
@@ -1387,11 +1465,11 @@ impl InsnParser {
 		} else {
 			// If we can fit the constant index into a u8 then use LDC otherwise use LDC_W
 			if constant <= 0xFF {
-				wtr.write_u8(InsnParser::LDC);
+				wtr.write_u8(InsnParser::LDC)?;
 				wtr.write_u8(constant as u8)?;
 				Ok(3)
 			} else {
-				wtr.write_u8(InsnParser::LDC_W);
+				wtr.write_u8(InsnParser::LDC_W)?;
 				wtr.write_u16::<BigEndian>(constant)?;
 				Ok(5)
 			}

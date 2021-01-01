@@ -6,7 +6,14 @@ use enum_display_derive::DisplayDebug;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
 	Reference(Option<String>), // If None then the reference refers to no particular class
-	Primitive(PrimitiveType)
+	Boolean,
+	Byte,
+	Char,
+	Short,
+	Int,
+	Long,
+	Float,
+	Double
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -24,10 +31,14 @@ pub enum PrimitiveType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
 	Reference,
+	Boolean,
+	Byte,
+	Char,
+	Short,
 	Int,
+	Long,
 	Float,
-	Double,
-	Long
+	Double
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -44,13 +55,18 @@ pub enum ReturnType {
 	Double
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum IntegerType {
+	Int,
+	Long
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LabelInsn {
 	/// unique identifier
 	pub(crate) id: u32
 }
 
-#[allow(dead_code)]
 impl LabelInsn {
 	pub(crate) fn new(id: u32) -> Self {
 		LabelInsn { id }
@@ -168,33 +184,33 @@ pub struct SubtractInsn {
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AndInsn {
-	pub kind: PrimitiveType
+	pub kind: IntegerType
 }
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OrInsn {
-	pub kind: PrimitiveType
+	pub kind: IntegerType
 }
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct XorInsn {
-	pub kind: PrimitiveType
+	pub kind: IntegerType
 }
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ShiftLeftInsn {
-	pub kind: OpType
+	pub kind: IntegerType
 }
 
 /// Arithmetically shift right
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ShiftRightInsn {
-	pub kind: OpType
+	pub kind: IntegerType
 }
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LogicalShiftRightInsn {
-	pub kind: OpType
+	pub kind: IntegerType
 }
 
 /// duplicates the value at the top of the stack
@@ -208,8 +224,9 @@ pub struct DupInsn {
 
 #[derive(Constructor, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct PopInsn {
-	/// The number of items to pop
-	pub num: u8,
+	/// if false, pop a single 32bit item off the stack (not long or double)
+	/// if true, pop either two 32bit items, or one 64bit item (long or double)
+	pub pop_two: bool
 }
 
 #[derive(Constructor, Clone, Debug, PartialEq, Eq)]
@@ -250,21 +267,37 @@ pub struct ConditionalJumpInsn {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum JumpCondition {
+	/// The reference at the top of the stack is null
 	IsNull,
+	/// The reference at the top of the stack is not null
 	NotNull,
+	/// The two references at the top of the stack are the same
 	ReferencesEqual,
+	/// The two references at the top of the stack are not the same
 	ReferencesNotEqual,
+	/// The two ints at the top of the stack are equal
 	IntsEq,
+	/// The two ints at the top of the stack are not equal
 	IntsNotEq,
+	/// The int second on the stack is less than the int at the top of the stack
 	IntsLessThan,
+	/// The int second on the stack is less than or equal to the int at the top of the stack
 	IntsLessThanOrEq,
+	/// The int second on the stack is greater than the int at the top of the stack
 	IntsGreaterThan,
+	/// The int second on the stack is greater than or equal to the int at the top of the stack
 	IntsGreaterThanOrEq,
+	/// The int at the top of the stack is 0
 	IntEqZero,
+	/// The int at the top of the stack is not 0
 	IntNotEqZero,
+	/// The int at the top of the stack is less than 0
 	IntLessThanZero,
+	/// The int at the top of the stack is less than or equal to 0
 	IntLessThanOrEqZero,
+	/// The int at the top of the stack is greater than 0
 	IntGreaterThanZero,
+	/// The int at the top of the stack is less greater or equal to 0
 	IntGreaterThanOrEqZero,
 }
 

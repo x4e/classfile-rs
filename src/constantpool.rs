@@ -711,36 +711,33 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn class(&mut self, name_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Class(ClassInfo {
-			name_index
-		}))
+		self.put(ConstantType::Class(ClassInfo::new(name_index)))
+	}
+	
+	pub fn class_utf8<T: Into<String>>(&mut self, str: T) -> CPIndex {
+		let utf = self.utf8(str);
+		self.class(utf)
 	}
 	
 	pub fn fieldref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Fieldref(FieldRefInfo {
-			class_index,
-			name_and_type_index
-		}))
+		self.put(ConstantType::Fieldref(FieldRefInfo::new(class_index, name_and_type_index)))
 	}
 	
 	pub fn methodref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Methodref(MethodRefInfo {
-			class_index,
-			name_and_type_index
-		}))
+		self.put(ConstantType::Methodref(MethodRefInfo::new(class_index, name_and_type_index)))
 	}
 	
 	pub fn interfacemethodref(&mut self, class_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::InterfaceMethodref(MethodRefInfo {
-			class_index,
-			name_and_type_index
-		}))
+		self.put(ConstantType::InterfaceMethodref(MethodRefInfo::new(class_index, name_and_type_index)))
 	}
 	
 	pub fn string(&mut self, string_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::String(StringInfo {
-			utf_index: string_index
-		}))
+		self.put(ConstantType::String(StringInfo::new(string_index)))
+	}
+	
+	pub fn string_utf<T: Into<String>>(&mut self, str: T) -> CPIndex {
+		let utf = self.utf8(str);
+		self.string(utf)
 	}
 	
 	pub fn integer(&mut self, bytes: i32) -> CPIndex {
@@ -760,55 +757,40 @@ impl ConstantPoolWriter {
 	}
 	
 	pub fn nameandtype(&mut self, name_index: CPIndex, descriptor_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::NameAndType(NameAndTypeInfo {
-			name_index,
-			descriptor_index
-		}))
+		self.put(ConstantType::NameAndType(NameAndTypeInfo::new(name_index, descriptor_index)))
 	}
 	
 	pub fn utf8<T: Into<String>>(&mut self, str: T) -> CPIndex {
-		self.put(ConstantType::Utf8(Utf8Info {
-			str: str.into()
-		}))
+		self.put(ConstantType::Utf8(Utf8Info::new(str.into())))
 	}
 	
 	pub fn methodhandle(&mut self, kind: MethodHandleKind, reference: CPIndex) -> CPIndex {
-		self.put(ConstantType::MethodHandle(MethodHandleInfo {
-			kind,
-			reference
-		}))
+		self.put(ConstantType::MethodHandle(MethodHandleInfo::new(kind, reference)))
 	}
 	
 	pub fn methodtype(&mut self, descriptor_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::MethodType(MethodTypeInfo {
-			descriptor_index
-		}))
+		self.put(ConstantType::MethodType(MethodTypeInfo::new(descriptor_index)))
+	}
+	
+	pub fn methodtype_utf8<T: Into<String>>(&mut self, str: T) -> CPIndex {
+		let utf = self.utf8(str);
+		self.methodtype(utf)
 	}
 	
 	pub fn dynamicinfo(&mut self, bootstrap_method_attr_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Dynamic(DynamicInfo {
-			bootstrap_method_attr_index,
-			name_and_type_index
-		}))
+		self.put(ConstantType::Dynamic(DynamicInfo::new(bootstrap_method_attr_index, name_and_type_index)))
 	}
 	
 	pub fn invokedynamicinfo(&mut self, bootstrap_method_attr_index: CPIndex, name_and_type_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::InvokeDynamic(InvokeDynamicInfo {
-			bootstrap_method_attr_index,
-			name_and_type_index
-		}))
+		self.put(ConstantType::InvokeDynamic(InvokeDynamicInfo::new(bootstrap_method_attr_index, name_and_type_index)))
 	}
 	
 	pub fn module(&mut self, name_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Module(ModuleInfo {
-			name_index
-		}))
+		self.put(ConstantType::Module(ModuleInfo::new(name_index)))
 	}
 	
 	pub fn package(&mut self, name_index: CPIndex) -> CPIndex {
-		self.put(ConstantType::Package(PackageInfo {
-			name_index
-		}))
+		self.put(ConstantType::Package(PackageInfo::new(name_index)))
 	}
 	
 	pub fn write<W: Write>(&mut self, wtr: &mut W) -> Result<()> {

@@ -36,6 +36,8 @@ pub enum ParserError {
 	OutOfBoundsJumpIndex(i32),
 	#[error("Invalid Utf8 {0}")]
 	InvalidUtf8(Utf8Error),
+	#[error("Too many instructions in method")]
+	TooManyInstructions(),
 	#[error("{0}")]
 	Other(String)
 }
@@ -97,6 +99,10 @@ impl ParserError {
 	
 	pub fn invalid_utf8(err: Utf8Error) -> Self {
 		ParserError::InvalidUtf8(err).check_panic()
+	}
+	
+	pub fn too_many_instructions() -> Self {
+		ParserError::TooManyInstructions().check_panic()
 	}
 	
 	pub fn other<T>(name: T) -> Self

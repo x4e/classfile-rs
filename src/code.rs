@@ -1028,7 +1028,7 @@ impl InsnParser {
 						Type::Float => InsnParser::FALOAD,
 						Type::Double => InsnParser::DALOAD
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::ArrayStore(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1041,7 +1041,7 @@ impl InsnParser {
 						Type::Float => InsnParser::FASTORE,
 						Type::Double => InsnParser::DASTORE
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Ldc(x) => {
 					pc = pc.checked_add(match &x.constant {
@@ -1072,7 +1072,7 @@ impl InsnParser {
 						}
 						LdcType::MethodHandle() => return Err(ParserError::invalid_insn(pc, "MethodHandle LDC")),
 						LdcType::Dynamic() => return Err(ParserError::invalid_insn(pc, "Dynamic LDC")),
-					}).ok_or_else(|| ParserError::too_many_instructions())?;
+					}).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::LocalLoad(x) => {
 					let (op0, op1, op2, op3, opx) = match &x.kind {
@@ -1085,30 +1085,30 @@ impl InsnParser {
 					match x.index {
 						0 => {
 							wtr.write_u8(op0)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						1 => {
 							wtr.write_u8(op1)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						2 => {
 							wtr.write_u8(op2)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						3 => {
 							wtr.write_u8(op3)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						index => {
 							if index <= 0xFF {
 								wtr.write_u8(opx)?;
 								wtr.write_u8(index as u8)?;
-								pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+								pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 							} else {
 								wtr.write_u8(InsnParser::WIDE)?;
 								wtr.write_u8(opx)?;
 								wtr.write_u16::<BigEndian>(index)?;
-								pc = pc.checked_add(4).ok_or_else(|| ParserError::too_many_instructions())?;
+								pc = pc.checked_add(4).ok_or_else(ParserError::too_many_instructions)?;
 							}
 						}
 					}
@@ -1124,30 +1124,30 @@ impl InsnParser {
 					match x.index {
 						0 => {
 							wtr.write_u8(op0)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						1 => {
 							wtr.write_u8(op1)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						2 => {
 							wtr.write_u8(op2)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						3 => {
 							wtr.write_u8(op3)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						index => {
 							if index <= 0xFF {
 								wtr.write_u8(opx)?;
 								wtr.write_u8(index as u8)?;
-								pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+								pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 							} else {
 								wtr.write_u8(InsnParser::WIDE)?;
 								wtr.write_u8(opx)?;
 								wtr.write_u16::<BigEndian>(index)?;
-								pc = pc.checked_add(4).ok_or_else(|| ParserError::too_many_instructions())?;
+								pc = pc.checked_add(4).ok_or_else(ParserError::too_many_instructions)?;
 							}
 						}
 					}
@@ -1164,47 +1164,47 @@ impl InsnParser {
 							};
 							wtr.write_u8(InsnParser::ANEWARRAY)?;
 							wtr.write_u16::<BigEndian>(constant_pool.class_utf8(cls))?;
-							pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Boolean => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(4)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Byte => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(8)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Char => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(5)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Short => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(9)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Int => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(10)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Long => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(11)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Float => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(6)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						Type::Double => {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(7)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 					}
 				}
@@ -1222,20 +1222,20 @@ impl InsnParser {
 						ReturnType::Float => wtr.write_u8(InsnParser::FRETURN)?,
 						ReturnType::Double => wtr.write_u8(InsnParser::DRETURN)?,
 					}
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::ArrayLength(x) => {
 					wtr.write_u8(InsnParser::ARRAYLENGTH)?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Throw(x) => {
 					wtr.write_u8(InsnParser::ATHROW)?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::CheckCast(x) => {
 					wtr.write_u8(InsnParser::CHECKCAST)?;
 					wtr.write_u16::<BigEndian>(constant_pool.class_utf8(x.kind.clone()))?;
-					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Convert(x) => {
 					match &x.from {
@@ -1249,7 +1249,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::I2F,
 								PrimitiveType::Double => InsnParser::I2D
 							})?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Long => {
 							wtr.write_u8(match &x.to {
@@ -1258,7 +1258,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::L2F,
 								PrimitiveType::Double => InsnParser::L2D
 							})?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Float => {
 							wtr.write_u8(match &x.to {
@@ -1267,7 +1267,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::NOP,
 								PrimitiveType::Double => InsnParser::F2D
 							})?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Double => {
 							wtr.write_u8(match &x.to {
@@ -1276,7 +1276,7 @@ impl InsnParser {
 								PrimitiveType::Float => InsnParser::D2F,
 								PrimitiveType::Double => InsnParser::NOP
 							})?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 					}
 				}
@@ -1291,7 +1291,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FADD,
 						PrimitiveType::Double => InsnParser::DADD
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Compare(x) => {
 					match &x.kind {
@@ -1299,19 +1299,19 @@ impl InsnParser {
 							// there's no int comparison opcode, but we can use long comparison
 							wtr.write_u8(InsnParser::I2L)?;
 							wtr.write_u8(InsnParser::LCMP)?;
-							pc = pc.checked_add(2).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Long => {
 							wtr.write_u8(InsnParser::LCMP)?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Float => {
 							wtr.write_u8(if x.pos_on_nan { InsnParser::FCMPG } else { InsnParser::FCMPL })?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 						PrimitiveType::Double => {
 							wtr.write_u8(if x.pos_on_nan { InsnParser::DCMPG } else { InsnParser::DCMPL })?;
-							pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+							pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 						}
 					}
 				}
@@ -1322,7 +1322,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FDIV,
 						PrimitiveType::Double => InsnParser::DDIV
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Multiply(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1331,7 +1331,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FMUL,
 						PrimitiveType::Double => InsnParser::DMUL
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Negate(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1340,7 +1340,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FNEG,
 						PrimitiveType::Double => InsnParser::DNEG
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Remainder(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1349,7 +1349,7 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FREM,
 						PrimitiveType::Double => InsnParser::DREM
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Subtract(x) => {
 					wtr.write_u8(match &x.kind {
@@ -1358,49 +1358,49 @@ impl InsnParser {
 						PrimitiveType::Float => InsnParser::FSUB,
 						PrimitiveType::Double => InsnParser::DSUB
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::And(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::IAND,
 						IntegerType::Long => InsnParser::LAND
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Or(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::IOR,
 						IntegerType::Long => InsnParser::LOR
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Xor(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::IXOR,
 						IntegerType::Long => InsnParser::LXOR
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::ShiftLeft(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::ISHL,
 						IntegerType::Long => InsnParser::LSHL
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::ShiftRight(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::ISHR,
 						IntegerType::Long => InsnParser::LSHR
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::LogicalShiftRight(x) => {
 					wtr.write_u8(match &x.kind {
 						IntegerType::Int => InsnParser::IUSHR,
 						IntegerType::Long => InsnParser::LUSHR
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Dup(x) => {
 					wtr.write_u8(match x.num {
@@ -1422,14 +1422,14 @@ impl InsnParser {
 						}
 						_ => return Err(ParserError::invalid_insn(pc, "DupInsn::num must be in the range 1-2"))
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Pop(x) => {
 					wtr.write_u8(match x.pop_two {
 						false => InsnParser::POP,
 						true => InsnParser::POP2,
 					})?;
-					pc = pc.checked_add(1).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::GetField(x) => {
 					wtr.write_u8(if x.instance { InsnParser::GETFIELD } else { InsnParser::GETSTATIC })?;
@@ -1438,7 +1438,7 @@ impl InsnParser {
 					let desc_ref = constant_pool.utf8(x.descriptor.clone());
 					let nametype_ref = constant_pool.nameandtype(name_ref, desc_ref);
 					wtr.write_u16::<BigEndian>(constant_pool.fieldref(class_ref, nametype_ref))?;
-					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::PutField(x) => {
 					wtr.write_u8(if x.instance { InsnParser::PUTFIELD } else { InsnParser::PUTSTATIC })?;
@@ -1447,7 +1447,7 @@ impl InsnParser {
 					let desc_ref = constant_pool.utf8(x.descriptor.clone());
 					let nametype_ref = constant_pool.nameandtype(name_ref, desc_ref);
 					wtr.write_u16::<BigEndian>(constant_pool.fieldref(class_ref, nametype_ref))?;
-					pc = pc.checked_add(3).ok_or_else(|| ParserError::too_many_instructions())?;
+					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 				}
 				Insn::Jump(_) => {}
 				Insn::ConditionalJump(_) => {}

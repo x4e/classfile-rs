@@ -34,6 +34,10 @@ impl InsnList {
 	pub fn iter(&self) -> Iter<'_, Insn> {
 		self.insns.iter()
 	}
+	
+	pub fn len(&self) -> usize {
+		self.insns.len()
+	}
 }
 
 

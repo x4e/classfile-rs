@@ -1503,9 +1503,90 @@ impl InsnParser {
 					wtr.write_u16::<BigEndian>(constant_pool.fieldref(class_ref, nametype_ref))?;
 					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 				}
-				Insn::Jump(_) => {}
-				Insn::ConditionalJump(_) => {}
-				Insn::IncrementInt(_) => {}
+				Insn::Jump(x) => {
+					if let Some(to) = label_pc_map.get(&x.jump_to) {
+						let offset = pc - *to;
+						// backwards reference
+						if offset < 0xFFFF {
+							wtr.write_u8(InsnParser::GOTO)?;
+							wtr.write_u16::<BigEndian>(offset as u16)?;
+							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
+						} else {
+							wtr.write_u8(InsnParser::GOTO_W)?;
+							wtr.write_u32::<BigEndian>(offset)?;
+							pc = pc.checked_add(5).ok_or_else(ParserError::too_many_instructions)?;
+						}
+					} else {
+						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
+							vec.push(pc);
+						} else {
+							let mut vec = Vec::new();
+							vec.push(pc);
+							forward_references.insert(x.jump_to.clone(), vec);
+						}
+						wtr.write_u8(InsnParser::GOTO)?;
+						wtr.write_u16(0)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
+					}
+				}
+				Insn::ConditionalJump(x) => {
+					let opcode = match x.condition {
+						JumpCondition::IsNull => InsnParser::IFNULL,
+						JumpCondition::NotNull => InsnParser::IFNONNULL,
+						JumpCondition::ReferencesEqual => InsnParser::IF_ACMPEQ,
+						JumpCondition::ReferencesNotEqual => InsnParser::IF_ACMPNE,
+						JumpCondition::IntsEq => InsnParser::IF_ICMPEQ,
+						JumpCondition::IntsNotEq => InsnParser::IF_ICMPNE,
+						JumpCondition::IntsLessThan => InsnParser::IF_ICMPLT,
+						JumpCondition::IntsLessThanOrEq => InsnParser::IF_ICMPLE,
+						JumpCondition::IntsGreaterThan => InsnParser::IF_ICMPGT,
+						JumpCondition::IntsGreaterThanOrEq => InsnParser::IF_ICMPGE,
+						JumpCondition::IntEqZero => InsnParser::IFEQ,
+						JumpCondition::IntNotEqZero => InsnParser::IFNE,
+						JumpCondition::IntLessThanZero => InsnParser::IFLT,
+						JumpCondition::IntLessThanOrEqZero => InsnParser::IFLE,
+						JumpCondition::IntGreaterThanZero => InsnParser::IFGT,
+						JumpCondition::IntGreaterThanOrEqZero => InsnParser::IFGE
+					};
+					
+					if let Some(to) = label_pc_map.get(&x.jump_to) {
+						let offset = pc - *to;
+						// backwards reference
+						if offset < 0xFFFF {
+							wtr.write_u8(opcode)?;
+							wtr.write_u16::<BigEndian>(offset as u16)?;
+							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
+						} else {
+							wtr.write_u8(opcode)?;
+							wtr.write_u16(3)?;
+							wtr.write_u8(InsnParser::GOTO_W)?;
+							wtr.write_u32::<BigEndian>(offset - 3)?;
+							pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
+						}
+					} else {
+						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
+							vec.push(pc);
+						} else {
+							let mut vec = Vec::new();
+							vec.push(pc);
+							forward_references.insert(x.jump_to.clone(), vec);
+						}
+						wtr.write_u8(opcode)?;
+						wtr.write_u16(0)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						wtr.write_u8(InsnParser::NOP)?;
+						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
+					}
+				}
+				Insn::IncrementInt(x) => {}
 				Insn::InstanceOf(_) => {}
 				Insn::InvokeDynamic(_) => {}
 				Insn::Invoke(_) => {}

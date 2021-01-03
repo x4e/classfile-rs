@@ -10,6 +10,7 @@ use crate::utils::{ReadUtils};
 use std::collections::{HashMap};
 use std::mem;
 use derive_more::Constructor;
+use std::convert::TryFrom;
 
 #[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -904,6 +905,12 @@ impl InsnParser {
 							pc += 2;
 							Insn::LocalStore(LocalStoreInsn::new(OpType::Double, index))
 						},
+						InsnParser::IINC => {
+							let index = rdr.read_u16::<BigEndian>()?;
+							let amount = rdr.read_i16::<BigEndian>()?;
+							pc += 4;
+							Insn::IncrementInt(IncrementIntInsn::new(index, amount))
+						}
 						InsnParser::RET => unimplemented!("Wide Ret instructions are not implemented"),
 						_ => return Err(ParserError::invalid_insn(this_pc, format!("Invalid wide opcode {:x}", opcode)))
 					}
@@ -1525,7 +1532,7 @@ impl InsnParser {
 							forward_references.insert(x.jump_to.clone(), vec);
 						}
 						wtr.write_u8(InsnParser::GOTO)?;
-						wtr.write_u16(0)?;
+						wtr.write_u16::<BigEndian>(0)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
@@ -1563,7 +1570,7 @@ impl InsnParser {
 							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 						} else {
 							wtr.write_u8(opcode)?;
-							wtr.write_u16(3)?;
+							wtr.write_u16::<BigEndian>(3)?;
 							wtr.write_u8(InsnParser::GOTO_W)?;
 							wtr.write_u32::<BigEndian>(offset - 3)?;
 							pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
@@ -1577,7 +1584,7 @@ impl InsnParser {
 							forward_references.insert(x.jump_to.clone(), vec);
 						}
 						wtr.write_u8(opcode)?;
-						wtr.write_u16(0)?;
+						wtr.write_u16::<BigEndian>(0)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
@@ -1586,8 +1593,29 @@ impl InsnParser {
 						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
 					}
 				}
-				Insn::IncrementInt(x) => {}
-				Insn::InstanceOf(_) => {}
+				Insn::IncrementInt(x) => {
+					let index = x.index;
+					let amount = x.amount;
+					// need to check if we can fit the amount into 1 byte
+					if let (Ok(index), Ok(amount)) = (u8::try_from(index), i8::try_from(amount)) {
+						wtr.write_u8(InsnParser::IINC)?;
+						wtr.write_u8(index)?;
+						wtr.write_i8(amount)?;
+						pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
+					} else {
+						wtr.write_u8(InsnParser::WIDE)?;
+						wtr.write_u8(InsnParser::IINC)?;
+						wtr.write_u16::<BigEndian>(index)?;
+						wtr.write_i16::<BigEndian>(amount)?;
+						pc = pc.checked_add(6).ok_or_else(ParserError::too_many_instructions)?;
+					}
+				}
+				Insn::InstanceOf(x) => {
+					wtr.write_u8(InsnParser::INSTANCEOF)?;
+					let utf = constant_pool.utf8(x.class.clone());
+					wtr.write_u16::<BigEndian>(constant_pool.class(utf))?;
+					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
+				}
 				Insn::InvokeDynamic(_) => {}
 				Insn::Invoke(_) => {}
 				Insn::LookupSwitch(_) => {}

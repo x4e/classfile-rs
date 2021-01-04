@@ -1,20 +1,8 @@
+use crate::types::Type;
 use derive_more::Constructor;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use enum_display_derive::DisplayDebug;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Type {
-	Reference(Option<String>), // If None then the reference refers to no particular class
-	Boolean,
-	Byte,
-	Char,
-	Short,
-	Int,
-	Long,
-	Float,
-	Double
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PrimitiveType {

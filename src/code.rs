@@ -11,6 +11,7 @@ use std::collections::{HashMap};
 use std::mem;
 use derive_more::Constructor;
 use std::convert::TryFrom;
+use crate::types::Type;
 
 #[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -1612,12 +1613,33 @@ impl InsnParser {
 				}
 				Insn::InstanceOf(x) => {
 					wtr.write_u8(InsnParser::INSTANCEOF)?;
-					let utf = constant_pool.utf8(x.class.clone());
-					wtr.write_u16::<BigEndian>(constant_pool.class(utf))?;
+					wtr.write_u16::<BigEndian>(constant_pool.class_utf8(x.class.clone()))?;
 					pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 				}
-				Insn::InvokeDynamic(_) => {}
-				Insn::Invoke(_) => {}
+				Insn::InvokeDynamic(x) => {
+					return Err(ParserError::unimplemented("Invokedynamic writing unimplemented"));
+				}
+				Insn::Invoke(x) => {
+					let opcode = match x.kind {
+						InvokeType::Instance => InsnParser::INVOKEVIRTUAL,
+						InvokeType::Static => InsnParser::INVOKESTATIC,
+						InvokeType::Interface => InsnParser::INVOKEINTERFACE,
+						InvokeType::Special => InsnParser::INVOKESPECIAL
+					};
+					wtr.write_u8(opcode)?;
+					if opcode == InsnParser::INVOKEINTERFACE {
+						let class = constant_pool.class_utf8(x.class.clone());
+						let name = constant_pool.utf8(x.name.clone());
+						let desc = constant_pool.utf8(x.descriptor.clone());
+						let nandt = constant_pool.nameandtype(name, desc);
+						wtr.write_u16::<BigEndian>(constant_pool.interfacemethodref(class, nandt))?;
+						// The count operand of an invokeinterface instruction is valid if it is
+						// the difference between the size of the operand stack before and after the instruction
+						// executes.
+						let mut count = 0;
+						
+					}
+				}
 				Insn::LookupSwitch(_) => {}
 				Insn::TableSwitch(_) => {}
 				Insn::MonitorEnter(_) => {}

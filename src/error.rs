@@ -38,6 +38,8 @@ pub enum ParserError {
 	InvalidUtf8(Utf8Error),
 	#[error("Too many instructions in method")]
 	TooManyInstructions(),
+	#[error("Invalid Descriptor: {0}")]
+	InvalidDescriptor(String),
 	#[error("{0}")]
 	Other(String)
 }
@@ -103,6 +105,10 @@ impl ParserError {
 	
 	pub fn too_many_instructions() -> Self {
 		ParserError::TooManyInstructions().check_panic()
+	}
+	
+	pub fn invalid_descriptor<T: Into<String>>(msg: T) -> Self {
+		ParserError::InvalidDescriptor(msg.into()).check_panic()
 	}
 	
 	pub fn other<T>(name: T) -> Self

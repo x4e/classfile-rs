@@ -11,7 +11,7 @@ use std::collections::{HashMap};
 use std::mem;
 use derive_more::Constructor;
 use std::convert::TryFrom;
-use crate::types::Type;
+use crate::types::{Type, parse_method_desc};
 
 #[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -1102,7 +1102,8 @@ impl InsnParser {
 						Type::Int => InsnParser::IALOAD,
 						Type::Long => InsnParser::LALOAD,
 						Type::Float => InsnParser::FALOAD,
-						Type::Double => InsnParser::DALOAD
+						Type::Double => InsnParser::DALOAD,
+						Type::Void => return Err(ParserError::invalid_insn(pc, "Cannot use type Void in array load"))
 					})?;
 					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
@@ -1115,7 +1116,8 @@ impl InsnParser {
 						Type::Int => InsnParser::IASTORE,
 						Type::Long => InsnParser::LASTORE,
 						Type::Float => InsnParser::FASTORE,
-						Type::Double => InsnParser::DASTORE
+						Type::Double => InsnParser::DASTORE,
+						Type::Void => return Err(ParserError::invalid_insn(pc, "Cannot use type Void in array store"))
 					})?;
 					pc = pc.checked_add(1).ok_or_else(ParserError::too_many_instructions)?;
 				}
@@ -1267,7 +1269,8 @@ impl InsnParser {
 							wtr.write_u8(InsnParser::NEWARRAY)?;
 							wtr.write_u8(7)?;
 							pc = pc.checked_add(2).ok_or_else(ParserError::too_many_instructions)?;
-						}
+						},
+						Type::Void => return Err(ParserError::invalid_insn(pc, "Cannot use type Void in newarray"))
 					}
 				}
 				Insn::Return(x) => {
@@ -1636,8 +1639,21 @@ impl InsnParser {
 						// The count operand of an invokeinterface instruction is valid if it is
 						// the difference between the size of the operand stack before and after the instruction
 						// executes.
-						let mut count = 0;
-						
+						let mut count = 1; // interface methods are virtual so there is always at least one
+						let (args, _) = parse_method_desc(&x.descriptor)?;
+						for arg in args.iter() {
+							count += arg.size();
+						}
+						wtr.write_u8(count)?;
+						wtr.write_u8(0)?;
+						pc = pc.checked_add(5).ok_or_else(ParserError::too_many_instructions)?;
+					} else {
+						let class = constant_pool.class_utf8(x.class.clone());
+						let name = constant_pool.utf8(x.name.clone());
+						let desc = constant_pool.utf8(x.descriptor.clone());
+						let nandt = constant_pool.nameandtype(name, desc);
+						wtr.write_u16::<BigEndian>(constant_pool.methodref(class, nandt))?;
+						pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 					}
 				}
 				Insn::LookupSwitch(_) => {}

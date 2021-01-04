@@ -25,12 +25,11 @@ pub trait Serializable : Sized {
 
 #[cfg(test)]
 mod tests {
+	use crate::classfile::ClassFile;
+	use crate::error::Result;
 	use std::fs::{self, File, DirEntry, OpenOptions};
 	use std::io::{BufReader, BufWriter};
 	use std::process::Command;
-	use crate::classfile::ClassFile;
-	use crate::error::Result;
-	use crate::types::{parse_type, parse_method_desc};
 	
 	fn read(dir: &str) -> Result<ClassFile> {
 		// Read
@@ -56,14 +55,6 @@ mod tests {
 			let entry = entry?;
 			op(entry)?;
 		}
-		Ok(())
-	}
-	
-	#[test]
-	fn test_descs() -> Result<()> {
-		println!("{:#x?}", parse_type(&String::from("Labc;"), 0));
-		println!("{:#x?}", parse_method_desc(String::from("(Ljava/lang/String;)V")));
-		
 		Ok(())
 	}
 	

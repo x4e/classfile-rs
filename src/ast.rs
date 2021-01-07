@@ -1,6 +1,6 @@
 use crate::types::Type;
 use derive_more::Constructor;
-use std::collections::HashMap;
+use std::collections::{BTreeMap};
 use std::fmt::{Debug, Formatter};
 use enum_display_derive::DisplayDebug;
 
@@ -346,13 +346,20 @@ pub enum InvokeType {
 	Special
 }
 
-#[derive(Constructor, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct LookupSwitchInsn {
 	pub default: LabelInsn,
-	pub(crate) cases: HashMap<i32, LabelInsn>
+	pub(crate) cases: BTreeMap<i32, LabelInsn>
 }
 
 impl LookupSwitchInsn {
+	pub fn new(default: LabelInsn) -> Self {
+		LookupSwitchInsn {
+			default,
+			cases: BTreeMap::new()
+		}
+	}
+	
 	pub fn get(&self, case: i32) -> Option<LabelInsn> {
 		self.cases.get(&case).cloned()
 	}

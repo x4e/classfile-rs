@@ -740,20 +740,18 @@ impl InsnParser {
 					let default = LabelInsn::new((rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32);
 					let npairs = rdr.read_i32::<BigEndian>()? as u32;
 					
-					let mut cases: HashMap<i32, LabelInsn> = HashMap::with_capacity(npairs as usize);
+					let mut insn = LookupSwitchInsn::new(default);
+					
 					for i in 0..npairs {
 						let matc = rdr.read_i32::<BigEndian>()?;
 						let jump = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
-						cases.insert(matc, LabelInsn::new(jump));
+						insn.cases.insert(matc, LabelInsn::new(jump));
 					}
 					
 					pc += pad + (2 * 4) + (npairs * 2 * 4);
 					required_labels += npairs + 1;
 					
-					Insn::LookupSwitch(LookupSwitchInsn {
-						default,
-						cases
-					})
+					Insn::LookupSwitch(insn)
 				}
 				InsnParser::LOR => Insn::Or(OrInsn::new(IntegerType::Long)),
 				InsnParser::LREM => Insn::Remainder(RemainderInsn::new(PrimitiveType::Long)),
@@ -1020,7 +1018,31 @@ impl InsnParser {
 		let mut wtr: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(code.insns.len()));
 		
 		let mut label_pc_map: HashMap<LabelInsn, u32> = HashMap::new();
-		let mut forward_references: HashMap<LabelInsn, Vec<u32>> = HashMap::new();
+		
+		enum ReferenceType {
+			/// 0: GOTO
+			/// 1: indexbyte_1
+			/// 2: indexbyte_2
+			/// 3: NOP
+			/// 4: NOP
+			Jump(u32),
+			/// 0: OPCODE (IF_IMPEQ, IFEQ...)
+			/// 1: indexbyte_1
+			/// 2: indexbyte_2
+			/// 3: NOP
+			/// 4: NOP
+			/// 5: NOP
+			/// 6: NOP
+			/// 7: NOP
+			Conditional(u32),
+			/// 0: indexbyte_1
+			/// 1: indexbyte_2
+			/// 2: indexbyte_3
+			/// 3: indexbyte_4
+			Direct(u32)
+		}
+		
+		let mut forward_references: HashMap<LabelInsn, Vec<ReferenceType>> = HashMap::new();
 		
 		let mut pc = 0u32;
 		for insn in code.insns.iter() {
@@ -1028,66 +1050,54 @@ impl InsnParser {
 				Insn::Label(x) => {
 					label_pc_map.insert(x.clone(), pc);
 					if let Some(refs) = forward_references.get(x) {
-						for at in refs.iter() {
-							let at = *at;
-							let i = at as usize;
-							// bytes following `at` are as follows
-							// 0: OPCODE (GOTO, IF_IMPEQ, IFEQ...)
-							// 1: indexbyte_1
-							// 2: indexbyte_2
-							// 3: NOP
-							// 4: NOP
-							// 5: NOP
-							// 6: NOP
-							// 7: NOP
-							// if it turns out we can't fit the 32bit offset into the 16bit provided by default
-							// we can turn the above into:
-							// 0: OPCODE
-							// 1: 0000
-							// 2: 0011 (3)
-							// 3: GOTO_W
-							// 4: indexbyte_1
-							// 5: indexbyte_2
-							// 6: indexbyte_3
-							// 7: indexbyte_4
-							let vec_mut = wtr.get_mut();
-							let opcode: u8 = vec_mut[i];
-							match opcode {
-								InsnParser::GOTO => {
-									let offset_1 = pc - at;
-									if offset_1 <= 0xFFFF {
-										let off_bytes = (offset_1 as u16).to_be_bytes();
-										vec_mut[i + 1] = off_bytes[0];
-										vec_mut[i + 2] = off_bytes[1];
+						let vec_mut = wtr.get_mut();
+						for ref_t in refs.iter() {
+							match ref_t {
+								ReferenceType::Jump(at) => {
+									let i = *at as usize;
+									let offset: i32 = pc as i32 - i as i32;
+									let off_bytes = offset.to_be_bytes();
+									if off_bytes[0] == 0 && off_bytes[1] == 0 {
+										vec_mut[i + 1] = off_bytes[2];
+										vec_mut[i + 2] = off_bytes[3];
 									} else {
 										// need to replace with a GOTO_W
 										vec_mut[i] = InsnParser::GOTO_W;
-										let off_bytes = offset_1.to_be_bytes();
 										vec_mut[i + 1] = off_bytes[0];
 										vec_mut[i + 2] = off_bytes[1];
 										vec_mut[i + 3] = off_bytes[2];
 										vec_mut[i + 4] = off_bytes[3];
 									}
 								}
-								_ => {
-									let offset_1 = pc - at;
-									if offset_1 <= 0xFFFF {
-										let off_bytes = (offset_1 as u16).to_be_bytes();
-										vec_mut[i + 1] = off_bytes[0];
-										vec_mut[i + 2] = off_bytes[1];
+								ReferenceType::Conditional(at) => {
+									let i = *at as usize;
+									let offset_1: i32 = pc as i32 - i as i32;
+									let off_bytes = offset_1.to_be_bytes();
+									if off_bytes[0] == 0 && off_bytes[1] == 0 {
+										vec_mut[i + 1] = off_bytes[2];
+										vec_mut[i + 2] = off_bytes[3];
 									} else {
-										// need to jump to a GOTO_W
-										let off_bytes = 3u16.to_be_bytes();
-										vec_mut[i + 1] = off_bytes[0];
-										vec_mut[i + 2] = off_bytes[1];
-										let offset_2 = pc - at + 3;
+										// need to add a a GOTO_W
+										let off_bytes_1 = 3i32.to_be_bytes();
+										vec_mut[i + 1] = off_bytes_1[2];
+										vec_mut[i + 2] = off_bytes_1[3];
+										let offset_2: i32 = pc as i32 - i as i32 - 3;
+										let off_bytes_2 = offset_2.to_be_bytes();
 										vec_mut[i + 3] = InsnParser::GOTO_W;
-										let off2_bytes = offset_2.to_be_bytes();
-										vec_mut[i + 4] = off2_bytes[0];
-										vec_mut[i + 5] = off2_bytes[1];
-										vec_mut[i + 6] = off2_bytes[2];
-										vec_mut[i + 7] = off2_bytes[3];
+										vec_mut[i + 4] = off_bytes_2[0];
+										vec_mut[i + 5] = off_bytes_2[1];
+										vec_mut[i + 6] = off_bytes_2[2];
+										vec_mut[i + 7] = off_bytes_2[3];
 									}
+								}
+								ReferenceType::Direct(at) => {
+									let i = *at as usize;
+									let offset: i32 = pc as i32 - i as i32;
+									let off_bytes = offset.to_be_bytes();
+									vec_mut[i + 0] = off_bytes[0];
+									vec_mut[i + 1] = off_bytes[1];
+									vec_mut[i + 2] = off_bytes[2];
+									vec_mut[i + 3] = off_bytes[3];
 								}
 							}
 						}
@@ -1516,30 +1526,28 @@ impl InsnParser {
 				}
 				Insn::Jump(x) => {
 					if let Some(to) = label_pc_map.get(&x.jump_to) {
-						let offset = pc - *to;
+						let offset: i32 = pc as i32 - (*to) as i32;
+						let off_bytes = offset.to_be_bytes();
 						// backwards reference
-						if offset < 0xFFFF {
+						if off_bytes[0] == 0 && off_bytes[1] == 0 {
 							wtr.write_u8(InsnParser::GOTO)?;
-							wtr.write_u16::<BigEndian>(offset as u16)?;
+							wtr.write_i16::<BigEndian>(offset as i16)?;
 							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 						} else {
 							wtr.write_u8(InsnParser::GOTO_W)?;
-							wtr.write_u32::<BigEndian>(offset)?;
+							wtr.write_i32::<BigEndian>(offset)?;
 							pc = pc.checked_add(5).ok_or_else(ParserError::too_many_instructions)?;
 						}
 					} else {
 						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
-							vec.push(pc);
+							vec.push(ReferenceType::Jump(pc));
 						} else {
 							let mut vec = Vec::new();
-							vec.push(pc);
+							vec.push(ReferenceType::Jump(pc));
 							forward_references.insert(x.jump_to.clone(), vec);
 						}
 						wtr.write_u8(InsnParser::GOTO)?;
 						wtr.write_u16::<BigEndian>(0)?;
-						wtr.write_u8(InsnParser::NOP)?;
-						wtr.write_u8(InsnParser::NOP)?;
-						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						wtr.write_u8(InsnParser::NOP)?;
 						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
@@ -1566,25 +1574,26 @@ impl InsnParser {
 					};
 					
 					if let Some(to) = label_pc_map.get(&x.jump_to) {
-						let offset = pc - *to;
+						let offset: i32 = pc as i32 - (*to) as i32;
+						let off_bytes = offset.to_be_bytes();
 						// backwards reference
-						if offset < 0xFFFF {
+						if off_bytes[0] == 0 && off_bytes[1] == 0 {
 							wtr.write_u8(opcode)?;
-							wtr.write_u16::<BigEndian>(offset as u16)?;
+							wtr.write_i16::<BigEndian>(offset as i16)?;
 							pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 						} else {
 							wtr.write_u8(opcode)?;
 							wtr.write_u16::<BigEndian>(3)?;
 							wtr.write_u8(InsnParser::GOTO_W)?;
-							wtr.write_u32::<BigEndian>(offset - 3)?;
+							wtr.write_i32::<BigEndian>(offset - 3)?;
 							pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
 						}
 					} else {
 						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
-							vec.push(pc);
+							vec.push(ReferenceType::Conditional(pc));
 						} else {
 							let mut vec = Vec::new();
-							vec.push(pc);
+							vec.push(ReferenceType::Conditional(pc));
 							forward_references.insert(x.jump_to.clone(), vec);
 						}
 						wtr.write_u8(opcode)?;
@@ -1656,7 +1665,49 @@ impl InsnParser {
 						pc = pc.checked_add(3).ok_or_else(ParserError::too_many_instructions)?;
 					}
 				}
-				Insn::LookupSwitch(_) => {}
+				Insn::LookupSwitch(x) => {
+					wtr.write_u8(InsnParser::LOOKUPSWITCH)?;
+					let pad = (4 - (pc % 4)) % 4;
+					for i in 0..pad {
+						wtr.write_u8(0)?;
+					}
+					
+					if let Some(at) = label_pc_map.get(&x.default) {
+						let offset: i32 = pc as i32 - (*at) as i32;
+						wtr.write_i32::<BigEndian>(offset)?;
+					} else {
+						if let Some(vec) = forward_references.get_mut(&x.default) {
+							vec.push(ReferenceType::Direct(pc + 2));
+						} else {
+							let mut vec = Vec::new();
+							vec.push(ReferenceType::Direct(pc + 2));
+							forward_references.insert(x.default.clone(), vec);
+						}
+						wtr.write_i32::<BigEndian>(0)?;
+					}
+					
+					wtr.write_i32::<BigEndian>(x.cases.len() as i32)?;
+					
+					pc = pc.checked_add(10).ok_or_else(ParserError::too_many_instructions)?;
+					
+					for (case, to) in x.cases.iter() {
+						wtr.write_i32::<BigEndian>(*case)?;
+						if let Some(at) = label_pc_map.get(to) {
+							let offset: i32 = (pc + 4) as i32 - (*at) as i32;
+							wtr.write_i32::<BigEndian>(offset)?;
+						} else {
+							if let Some(vec) = forward_references.get_mut(to) {
+								vec.push(ReferenceType::Direct(pc + 4));
+							} else {
+								let mut vec = Vec::new();
+								vec.push(ReferenceType::Direct(pc + 4));
+								forward_references.insert(to.clone(), vec);
+							}
+							wtr.write_i32::<BigEndian>(0)?;
+						}
+						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
+					}
+				}
 				Insn::TableSwitch(_) => {}
 				Insn::MonitorEnter(_) => {}
 				Insn::MonitorExit(_) => {}

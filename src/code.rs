@@ -35,17 +35,24 @@ impl CodeAttribute {
 	
 	pub fn parse(version: &ClassVersion, constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
 		let mut slice = buf.as_slice();
+		
 		let max_stack = slice.read_u16::<BigEndian>()?;
 		let max_locals = slice.read_u16::<BigEndian>()?;
+		
 		let code_length = slice.read_u32::<BigEndian>()?;
 		let mut code: Vec<u8> = vec![0; code_length as usize];
-		slice.read_exact(&mut code)?;
+		code.extend_from_slice(slice);
+		let (_, tmp) = slice.split_at(code_length as usize);
+		slice = tmp;
+		
 		let code = InsnParser::parse_insns(constant_pool, code.as_slice(), code_length)?;
+		
 		let num_exceptions = slice.read_u16::<BigEndian>()?;
 		let mut exceptions: Vec<ExceptionHandler> = Vec::with_capacity(num_exceptions as usize);
 		for _ in 0..num_exceptions {
 			exceptions.push(ExceptionHandler::parse(constant_pool, &mut slice)?);
 		}
+		
 		let attributes = Attributes::parse(&mut slice, AttributeSource::Code, version, constant_pool)?;
 		
 		Ok(CodeAttribute {
@@ -60,8 +67,14 @@ impl CodeAttribute {
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.max_stack)?;
 		wtr.write_u16::<BigEndian>(self.max_locals)?;
-		wtr.write_u16::<BigEndian>(self.max_stack)?;
-		wtr.write_all(InsnParser::write_insns(self, constant_pool)?.as_slice())?;
+		let code_bytes = InsnParser::write_insns(self, constant_pool)?;
+		wtr.write_u32::<BigEndian>(code_bytes.len() as u32)?;
+		wtr.write_all(code_bytes.as_slice())?;
+		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
+		for excep in self.exceptions.iter() {
+			excep.write(wtr, constant_pool)?;
+		}
+		Attributes::write(wtr, &self.attributes, constant_pool)?;
 		Ok(())
 	}
 }
@@ -76,6 +89,7 @@ pub struct ExceptionHandler {
 }
 
 impl ExceptionHandler {
+	// TODO: exception handlers should use labels
 	pub fn parse(constant_pool: &ConstantPool, buf: &mut &[u8]) -> Result<Self> {
 		let start_pc = buf.read_u16::<BigEndian>()?;
 		let end_pc = buf.read_u16::<BigEndian>()?;
@@ -95,11 +109,15 @@ impl ExceptionHandler {
 		})
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, _constant_pool: &ConstantPool) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.start_pc)?;
 		wtr.write_u16::<BigEndian>(self.end_pc)?;
 		wtr.write_u16::<BigEndian>(self.handler_pc)?;
-		wtr.write_u16::<BigEndian>(0)?; // catch type cp ref
+		let catch_type = match self.catch_type.clone() {
+			Some(x) => constant_pool.class_utf8(x),
+			None => 0
+		};
+		wtr.write_u16::<BigEndian>(catch_type)?;
 		Ok(())
 	}
 }
@@ -327,7 +345,6 @@ impl InsnParser {
 			let this_pc = pc;
 			let opcode = rdr.read_u8()?;
 			pc += 1;
-			//println!("Parsing {:X?}", opcode);
 			
 			let insn = match opcode {
 				InsnParser::AALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Reference(None))),
@@ -1708,7 +1725,13 @@ impl InsnParser {
 						pc = pc.checked_add(8).ok_or_else(ParserError::too_many_instructions)?;
 					}
 				}
-				Insn::TableSwitch(_) => {}
+				Insn::TableSwitch(x) => {
+					wtr.write_u8(InsnParser::TABLESWITCH)?;
+					let pad = (4 - (pc % 4)) % 4;
+					for i in 0..pad {
+						wtr.write_u8(0)?;
+					}
+				}
 				Insn::MonitorEnter(_) => {}
 				Insn::MonitorExit(_) => {}
 				Insn::MultiNewArray(_) => {}

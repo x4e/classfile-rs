@@ -16,7 +16,6 @@ pub mod Attributes {
 	
 	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Attribute>> {
 		let num_attributes = rdr.read_u16::<BigEndian>()? as usize;
-		println!("num_attributes {:#x?}", num_attributes);
 		let mut attributes: Vec<Attribute> = Vec::with_capacity(num_attributes);
 		for _ in 0..num_attributes {
 			attributes.push(Attribute::parse(rdr, &source, version, constant_pool)?);
@@ -64,8 +63,6 @@ impl ConstantValueAttribute {
 	}
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(constant_pool.utf8("ConstantValue"))?; // write name
-		wtr.write_u32::<BigEndian>(2)?; // length
 		let const_ref = match self.value.clone() {
 			ConstantValue::Long(x) => constant_pool.long(x),
 			ConstantValue::Float(x) => constant_pool.float(x),
@@ -102,8 +99,6 @@ impl SignatureAttribute {
 	}
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(constant_pool.utf8("Signature"))?; // write name
-		wtr.write_u32::<BigEndian>(2)?; // length
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.signature.clone()))?; // cp ref
 		Ok(())
 	}
@@ -134,9 +129,7 @@ impl ExceptionsAttribute {
 	}
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(constant_pool.utf8("Exceptions"))?; // write name
 		let num_exceptions = self.exceptions.len();
-		wtr.write_u32::<BigEndian>(2 + (num_exceptions as u32 * 2))?; // length
 		wtr.write_u16::<BigEndian>(num_exceptions as u16)?;
 		for exception in self.exceptions.iter() {
 			wtr.write_u16::<BigEndian>(constant_pool.utf8(exception.clone()))?;
@@ -181,8 +174,6 @@ impl SourceFileAttribute {
 	}
 	
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
-		wtr.write_u16::<BigEndian>(constant_pool.utf8("SourceFile"))?; // write name
-		wtr.write_u32::<BigEndian>(2)?; // length
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.source_file.clone()))?;
 		Ok(())
 	}
@@ -201,7 +192,6 @@ pub enum Attribute {
 impl Attribute {
 	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Attribute> {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		println!("Parsing: {:#x?}", name);
 		let attribute_length = rdr.read_u32::<BigEndian>()? as usize;
 		let mut buf: Vec<u8> = Vec::with_capacity(attribute_length);
 		rdr.take(attribute_length as u64).read_to_end(&mut buf)?;
@@ -239,7 +229,6 @@ impl Attribute {
 				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
 			}
 		};
-		println!("{:#x?}", attr);
 		Ok(attr)
 	}
 	

@@ -47,9 +47,7 @@ impl Method {
 	pub fn parse<R: Read>(rdr: &mut R, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Self> {
 		let access_flags = MethodAccessFlags::parse(rdr)?;
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		println!("name: {:#x?}", name);
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
-		println!("desc: {:#x?}", descriptor);
 		
 		let attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
 		
@@ -59,7 +57,6 @@ impl Method {
 			descriptor,
 			attributes
 		};
-		println!("{:#x?}", meth);
 		Ok(meth)
 	}
 	

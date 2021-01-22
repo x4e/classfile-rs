@@ -39,7 +39,7 @@ impl CodeAttribute {
 		let max_locals = slice.read_u16::<BigEndian>()?;
 		
 		let code_length = slice.read_u32::<BigEndian>()?;
-		let mut code: Vec<u8> = vec![0; code_length as usize];
+		let mut code: Vec<u8> = Vec::with_capacity(code_length as usize);
 		code.extend_from_slice(slice);
 		let (_, tmp) = slice.split_at(code_length as usize);
 		slice = tmp;

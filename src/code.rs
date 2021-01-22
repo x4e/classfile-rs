@@ -8,7 +8,6 @@ use crate::ast::*;
 use crate::insnlist::InsnList;
 use crate::utils::{ReadUtils};
 use std::collections::{HashMap};
-use std::mem;
 use derive_more::Constructor;
 use std::convert::TryFrom;
 use crate::types::{Type, parse_method_desc};
@@ -68,6 +67,7 @@ impl CodeAttribute {
 		wtr.write_u16::<BigEndian>(self.max_stack)?;
 		wtr.write_u16::<BigEndian>(self.max_locals)?;
 		let code_bytes = InsnParser::write_insns(self, constant_pool)?;
+		println!("Code Length: {}", code_bytes.len());
 		wtr.write_u32::<BigEndian>(code_bytes.len() as u32)?;
 		wtr.write_all(code_bytes.as_slice())?;
 		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
@@ -968,18 +968,12 @@ impl InsnParser {
 				}
 			}
 			insns.reserve_exact(insert.len());
-			for (index, insert) in insert.iter_mut() {
-				let index = *index;
-				#[allow(invalid_value)]
-				let mut empty = Vec::with_capacity(0);
-				mem::swap(insert, &mut empty);
-				for insn in empty.iter_mut() {
-					let mut empty: Insn = Insn::Nop(NopInsn::new());
-					mem::swap(insn, &mut empty);
+			for (index, mut insert) in insert.drain() {
+				for insn in insert.drain(..) {
 					if index <= insns.len() {
-						insns.insert(index, empty);
+						insns.insert(index, insn);
 					} else {
-						insns.push(empty);
+						insns.push(insn);
 					}
 				}
 			}

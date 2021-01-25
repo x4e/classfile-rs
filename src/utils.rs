@@ -1,4 +1,6 @@
 use std::io::Read;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 pub trait VecUtils <T> {
 	/// Overwrites the given index with the given item and returns the previous item if successful
@@ -41,3 +43,33 @@ pub trait ReadUtils: Read {
 	}
 }
 impl<W: Read + ?Sized> ReadUtils for W {}
+
+pub trait MapUtils <K, V> {
+	/// returns true if inserted
+	fn insert_if_not_present(&mut self, key: K, value: V) -> bool;
+	
+	fn insert_if_not_present_lazy<F>(&mut self, key: K, value: F) -> bool
+		where F: FnOnce() -> V;
+}
+
+impl <K: Eq + Hash, V> MapUtils<K, V> for HashMap<K, V> {
+	#[inline]
+	fn insert_if_not_present(&mut self, key: K, value: V) -> bool {
+		if self.get(&key).is_none() {
+			self.insert(key, value);
+			true
+		} else {
+			false
+		}
+	}
+	
+	#[inline]
+	fn insert_if_not_present_lazy<F>(&mut self, key: K, value: F) -> bool where F: FnOnce() -> V {
+		if self.get(&key).is_none() {
+			self.insert(key, value());
+			true
+		} else {
+			false
+		}
+	}
+}

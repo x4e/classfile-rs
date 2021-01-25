@@ -111,9 +111,17 @@ impl ParserError {
 		ParserError::InvalidDescriptor(msg.into()).check_panic()
 	}
 	
+	#[inline]
 	pub fn other<T>(name: T) -> Self
 		where T: Into<String> {
 		ParserError::Other(name.into()).check_panic()
+	}
+	
+	
+	
+	
+	pub fn unmapped_label() -> Self {
+		ParserError::other("No mapping found for label")
 	}
 }
 

@@ -1,16 +1,16 @@
 use crate::attributes::{Attribute, AttributeSource, Attributes};
 use crate::constantpool::{ConstantPool, ConstantType, CPIndex, ConstantPoolWriter};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Read, Write, Cursor};
 use crate::version::ClassVersion;
 use crate::error::{Result, ParserError};
 use crate::ast::*;
 use crate::insnlist::InsnList;
-use crate::utils::{ReadUtils};
-use std::collections::{HashMap};
+use crate::utils::{ReadUtils, MapUtils};
+use crate::types::{Type, parse_method_desc};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Read, Write, Cursor, Seek, SeekFrom};
+use std::collections::HashMap;
 use derive_more::Constructor;
 use std::convert::TryFrom;
-use crate::types::{Type, parse_method_desc};
 
 #[derive(Constructor, Clone, Debug, PartialEq)]
 pub struct CodeAttribute {
@@ -33,26 +33,29 @@ impl CodeAttribute {
 	}
 	
 	pub fn parse(version: &ClassVersion, constant_pool: &ConstantPool, buf: Vec<u8>) -> Result<Self> {
-		let mut slice = buf.as_slice();
+		let mut buf = Cursor::new(buf);
 		
-		let max_stack = slice.read_u16::<BigEndian>()?;
-		let max_locals = slice.read_u16::<BigEndian>()?;
+		let max_stack = buf.read_u16::<BigEndian>()?;
+		let max_locals = buf.read_u16::<BigEndian>()?;
 		
-		let code_length = slice.read_u32::<BigEndian>()?;
-		let mut code: Vec<u8> = Vec::with_capacity(code_length as usize);
-		code.extend_from_slice(slice);
-		let (_, tmp) = slice.split_at(code_length as usize);
-		slice = tmp;
+		let code_length = buf.read_u32::<BigEndian>()?;
 		
-		let code = InsnParser::parse_insns(constant_pool, code.as_slice(), code_length)?;
+		let code: Vec<u8> = buf.read_nbytes(code_length as usize)?;
+		let mut code = Cursor::new(code);
 		
-		let num_exceptions = slice.read_u16::<BigEndian>()?;
+		let mut pc_label_map: HashMap<u32, LabelInsn> = HashMap::new();
+		InsnParser::find_insn_refs(&mut code, code_length, &mut pc_label_map)?;
+		
+		code.set_position(0);
+		let code = InsnParser::parse_insns(constant_pool, &mut code, code_length, &mut pc_label_map)?;
+		
+		let num_exceptions = buf.read_u16::<BigEndian>()?;
 		let mut exceptions: Vec<ExceptionHandler> = Vec::with_capacity(num_exceptions as usize);
 		for _ in 0..num_exceptions {
-			exceptions.push(ExceptionHandler::parse(constant_pool, &mut slice)?);
+			exceptions.push(ExceptionHandler::parse(constant_pool, &mut buf)?);
 		}
 		
-		let attributes = Attributes::parse(&mut slice, AttributeSource::Code, version, constant_pool)?;
+		let attributes = Attributes::parse(&mut buf, AttributeSource::Code, version, constant_pool)?;
 		
 		Ok(CodeAttribute {
 			max_stack,
@@ -67,7 +70,6 @@ impl CodeAttribute {
 		wtr.write_u16::<BigEndian>(self.max_stack)?;
 		wtr.write_u16::<BigEndian>(self.max_locals)?;
 		let code_bytes = InsnParser::write_insns(self, constant_pool)?;
-		println!("Code Length: {}", code_bytes.len());
 		wtr.write_u32::<BigEndian>(code_bytes.len() as u32)?;
 		wtr.write_all(code_bytes.as_slice())?;
 		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
@@ -90,7 +92,7 @@ pub struct ExceptionHandler {
 
 impl ExceptionHandler {
 	// TODO: exception handlers should use labels
-	pub fn parse(constant_pool: &ConstantPool, buf: &mut &[u8]) -> Result<Self> {
+	pub fn parse<T: Read>(constant_pool: &ConstantPool, buf: &mut T) -> Result<Self> {
 		let start_pc = buf.read_u16::<BigEndian>()?;
 		let end_pc = buf.read_u16::<BigEndian>()?;
 		let handler_pc = buf.read_u16::<BigEndian>()?;
@@ -332,12 +334,224 @@ impl InsnParser {
 	const TABLESWITCH: u8 = 0xAA;
 	const WIDE: u8 = 0xC4;
 	
-	fn parse_insns<'m, T: Read>(constant_pool: &ConstantPool, mut rdr: T, length: u32) -> Result<InsnList> {
-		let num_insns_estimate = length as usize / 3; // conservative assumption average 3 bytes per insn
+	/// Iterate all instructions and collect any pcs that are referenced - i.e. need to have relevant Labels
+	fn find_insn_refs<T: Read + Seek>(rdr: &mut T, length: u32, pc_label_map: &mut HashMap<u32, LabelInsn>) -> Result<()> {
+		let mut pc: u32 = 0;
+		while pc < length {
+			let this_pc = pc;
+			let opcode = rdr.read_u8()?;
+			pc += 1;
+			
+			match opcode {
+				InsnParser::GOTO => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::GOTO_W => {
+					let to = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 4;
+				}
+				InsnParser::IF_ACMPEQ => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ACMPNE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPEQ => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPGE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPGT => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPLE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPLT => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IF_ICMPNE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFEQ => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFGE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFGT => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFLE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFLT => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFNE => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFNONNULL => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::IFNULL => {
+					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(to, LabelInsn::new(pc_label_map.len() as u32));
+					pc += 2;
+				}
+				InsnParser::LOOKUPSWITCH => {
+					let pad = 3 - (this_pc % 4);
+					rdr.seek(SeekFrom::Current(pad as i64))?;
+					
+					let default = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(default, LabelInsn::new(pc_label_map.len() as u32));
+					let npairs = rdr.read_i32::<BigEndian>()? as u32;
+					
+					for i in 0..npairs {
+						let matc = rdr.read_i32::<BigEndian>()?;
+						let jump = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+						pc_label_map.insert_if_not_present(jump, LabelInsn::new(pc_label_map.len() as u32));
+					}
+					
+					pc += pad + (2 * 4) + (npairs * 2 * 4);
+				}
+				InsnParser::TABLESWITCH => {
+					let pad = 3 - (this_pc % 4);
+					rdr.seek(SeekFrom::Current(pad as i64))?;
+					
+					let default = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+					pc_label_map.insert_if_not_present(default, LabelInsn::new(pc_label_map.len() as u32));
+					
+					let low = rdr.read_i32::<BigEndian>()?;
+					let high = rdr.read_i32::<BigEndian>()?;
+					let num_cases = (high - low + 1) as u32;
+					for i in 0..num_cases {
+						let case = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
+						pc_label_map.insert_if_not_present(case, LabelInsn::new(pc_label_map.len() as u32));
+					}
+					
+					pc += pad + ((3 + num_cases) * 4);
+				},
+				InsnParser::AALOAD | InsnParser::AASTORE | InsnParser::ACONST_NULL |
+				InsnParser::ALOAD_0 | InsnParser::ALOAD_1 | InsnParser::ALOAD_2 |
+				InsnParser::ALOAD_3 | InsnParser::ARETURN | InsnParser::ARRAYLENGTH |
+				InsnParser::ASTORE_0 | InsnParser::ASTORE_2 | InsnParser::ASTORE_3 |
+				InsnParser::ATHROW | InsnParser::BALOAD | InsnParser::BASTORE |
+				InsnParser::BREAKPOINT | InsnParser::CALOAD | InsnParser::CASTORE |
+				InsnParser::D2F | InsnParser::D2I | InsnParser::D2L | InsnParser::DADD |
+				InsnParser::DALOAD | InsnParser::DASTORE | InsnParser::DCMPG | InsnParser::DCMPL |
+				InsnParser::DCONST_0 | InsnParser::DCONST_1 | InsnParser::DDIV |
+				InsnParser::DLOAD_0 | InsnParser::DLOAD_1 | InsnParser::DLOAD_2 |
+				InsnParser::DLOAD_3 | InsnParser::DMUL | InsnParser::DNEG | InsnParser::DREM |
+				InsnParser::DRETURN | InsnParser::DSTORE_0 | InsnParser::DSTORE_1 |
+				InsnParser::DSTORE_2 | InsnParser::DSTORE_3 | InsnParser::DSUB | InsnParser::DUP |
+				InsnParser::DUP_X1 | InsnParser::DUP_X2 | InsnParser::DUP2 | InsnParser::DUP2_X1 |
+				InsnParser::DUP2_X2 | InsnParser::F2D | InsnParser::F2I | InsnParser::F2L |
+				InsnParser::FADD | InsnParser::FALOAD | InsnParser::FASTORE | InsnParser::FCMPG |
+				InsnParser::FCMPL | InsnParser::FCONST_0 | InsnParser::FCONST_1 |
+				InsnParser::FCONST_2 | InsnParser::FDIV | InsnParser::FLOAD_0 |
+				InsnParser::FLOAD_1 | InsnParser::FLOAD_2 | InsnParser::FLOAD_3 | InsnParser::FMUL |
+				InsnParser::FNEG | InsnParser::FREM | InsnParser::FRETURN | InsnParser::FSTORE_0 |
+				InsnParser::FSTORE_1 | InsnParser::FSTORE_2 | InsnParser::FSTORE_3 |
+				InsnParser::FSUB | InsnParser::I2B | InsnParser::I2C | InsnParser::I2D |
+				InsnParser::I2F | InsnParser::I2L | InsnParser::I2S | InsnParser::IADD |
+				InsnParser::IALOAD | InsnParser::IAND | InsnParser::IASTORE |
+				InsnParser::ICONST_M1 | InsnParser::ICONST_0 | InsnParser::ICONST_1 |
+				InsnParser::ICONST_2 | InsnParser::ICONST_3 | InsnParser::ICONST_4 |
+				InsnParser::ICONST_5 | InsnParser::IDIV | InsnParser::ILOAD_0 |
+				InsnParser::ILOAD_1 | InsnParser::ILOAD_2 | InsnParser::ILOAD_3 |
+				InsnParser::IMPDEP1 | InsnParser::IMPDEP2 | InsnParser::IMUL | InsnParser::INEG |
+				InsnParser::IOR | InsnParser::IREM | InsnParser::IRETURN | InsnParser::ISHL |
+				InsnParser::ISHR | InsnParser::ISTORE_0 | InsnParser::ISTORE_1 |
+				InsnParser::ISTORE_2 | InsnParser::ISTORE_3 | InsnParser::ISUB | InsnParser::IUSHR |
+				InsnParser::IXOR | InsnParser::L2D | InsnParser::L2F | InsnParser::L2I |
+				InsnParser::LADD | InsnParser::LALOAD | InsnParser::LAND | InsnParser::LASTORE |
+				InsnParser::LCMP | InsnParser::LCONST_0 | InsnParser::LCONST_1 | InsnParser::LDIV |
+				InsnParser::LLOAD_0 | InsnParser::LLOAD_1 | InsnParser::LLOAD_2 |
+				InsnParser::LLOAD_3 | InsnParser::LMUL | InsnParser::LNEG | InsnParser::LOR |
+				InsnParser::LREM | InsnParser::LRETURN | InsnParser::LSHL | InsnParser::LSHR |
+				InsnParser::LSTORE_0 | InsnParser::LSTORE_1 | InsnParser::LSTORE_2 |
+				InsnParser::LSTORE_3 | InsnParser::LSUB | InsnParser::LUSHR | InsnParser::LXOR |
+				InsnParser::MONITORENTER | InsnParser::MONITOREXIT | InsnParser::NOP |
+				InsnParser::POP | InsnParser::POP2 | InsnParser::RETURN | InsnParser::SALOAD |
+				InsnParser::SASTORE | InsnParser::SWAP => {},
+				InsnParser::ALOAD | InsnParser::ASTORE | InsnParser::BIPUSH | InsnParser::DLOAD |
+				InsnParser::DSTORE | InsnParser::FLOAD | InsnParser::FSTORE | InsnParser::ILOAD |
+				InsnParser::ISTORE | InsnParser::LDC | InsnParser::LLOAD | InsnParser::LSTORE |
+				InsnParser::NEWARRAY => {
+					pc += 1;
+					rdr.seek(SeekFrom::Current(1))?;
+				}
+				InsnParser::ANEWARRAY | InsnParser::CHECKCAST | InsnParser::GETFIELD |
+				InsnParser::GETSTATIC | InsnParser::IINC | InsnParser::INSTANCEOF |
+				InsnParser::INVOKESPECIAL | InsnParser::INVOKESTATIC | InsnParser::INVOKEVIRTUAL |
+				InsnParser::LDC_W | InsnParser::LDC2_W | InsnParser::NEW | InsnParser::PUTFIELD |
+				InsnParser::PUTSTATIC | InsnParser::SIPUSH => {
+					pc += 2;
+					rdr.seek(SeekFrom::Current(2))?;
+				}
+				InsnParser::MULTIANEWARRAY => {
+					pc += 3;
+					rdr.seek(SeekFrom::Current(3))?;
+				}
+				InsnParser::INVOKEDYNAMIC | InsnParser::INVOKEINTERFACE => {
+					pc += 4;
+					rdr.seek(SeekFrom::Current(4))?;
+				}
+				InsnParser::WIDE => match rdr.read_u8()? {
+					InsnParser::ILOAD | InsnParser::FLOAD | InsnParser::ALOAD | InsnParser::LLOAD | InsnParser::DLOAD | InsnParser::ISTORE | InsnParser::FSTORE | InsnParser::LSTORE | InsnParser::DSTORE => {
+						pc += 3;
+						rdr.seek(SeekFrom::Current(3))?;
+					}
+					InsnParser::IINC => {
+						pc += 5;
+						rdr.seek(SeekFrom::Current(5))?;
+					}
+					_ => return Err(ParserError::invalid_insn(this_pc, format!("Invalid wide opcode {:x}", opcode)))
+				},
+				_ => return Err(ParserError::unknown_insn(opcode))
+			}
+		}
+		Ok(())
+	}
+	
+	fn parse_insns<T: Read>(constant_pool: &ConstantPool, mut rdr: T, length: u32, pc_label_map: &mut HashMap<u32, LabelInsn>) -> Result<InsnList> {
+		let num_insns_estimate = length as usize / 3; // estimate an average 3 bytes per insn
 		let mut insns: Vec<Insn> = Vec::with_capacity(num_insns_estimate);
-		let mut required_labels: u32 = 0;
-		
-		let mut pc_index_map: HashMap<u32, u32> = HashMap::with_capacity(num_insns_estimate);
 		
 		let mut pc: u32 = 0;
 		let mut index: u32 = 0;
@@ -345,6 +559,11 @@ impl InsnParser {
 			let this_pc = pc;
 			let opcode = rdr.read_u8()?;
 			pc += 1;
+			
+			// does this pc need an associated label?
+			if let Some(lbl) = pc_label_map.get(&this_pc) {
+				insns.push(Insn::Label(*lbl));
+			}
 			
 			let insn = match opcode {
 				InsnParser::AALOAD => Insn::ArrayLoad(ArrayLoadInsn::new(Type::Reference(None))),
@@ -488,14 +707,12 @@ impl InsnParser {
 				InsnParser::GOTO => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::Jump(JumpInsn::new(LabelInsn::new(to)))
+					Insn::Jump(JumpInsn::new(*pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::GOTO_W => {
 					let to = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
 					pc += 4;
-					required_labels += 1;
-					Insn::Jump(JumpInsn::new(LabelInsn::new(to)))
+					Insn::Jump(JumpInsn::new(*pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::I2B => Insn::Convert(ConvertInsn::new(PrimitiveType::Int, PrimitiveType::Byte)),
 				InsnParser::I2C => Insn::Convert(ConvertInsn::new(PrimitiveType::Int, PrimitiveType::Char)),
@@ -518,98 +735,82 @@ impl InsnParser {
 				InsnParser::IF_ACMPEQ => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesEqual, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesEqual, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ACMPNE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesNotEqual, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::ReferencesNotEqual, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPEQ => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsEq, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsEq, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPGE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThanOrEq, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThanOrEq, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPGT => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThan, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsGreaterThan, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPLE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThanOrEq, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThanOrEq, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPLT => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThan, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsLessThan, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IF_ICMPNE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsNotEq, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntsNotEq, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFEQ => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntEqZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntEqZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFGE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanOrEqZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanOrEqZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFGT => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntGreaterThanZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFLE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanOrEqZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanOrEqZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFLT => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntLessThanZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFNE => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntNotEqZero, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IntNotEqZero, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFNONNULL => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::NotNull, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::NotNull, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IFNULL => {
 					let to = (rdr.read_i16::<BigEndian>()? as i32 + this_pc as i32) as u32;
 					pc += 2;
-					required_labels += 1;
-					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IsNull, LabelInsn::new(to as u32)))
+					Insn::ConditionalJump(ConditionalJumpInsn::new(JumpCondition::IsNull, *pc_label_map.get(&to).ok_or_else(ParserError::unmapped_label)?))
 				},
 				InsnParser::IINC => {
 					let index = rdr.read_u8()?;
@@ -754,19 +955,18 @@ impl InsnParser {
 					let pad = 3 - (this_pc % 4);
 					rdr.read_nbytes(pad as usize)?;
 					
-					let default = LabelInsn::new((rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32);
+					let default = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
 					let npairs = rdr.read_i32::<BigEndian>()? as u32;
 					
-					let mut insn = LookupSwitchInsn::new(default);
+					let mut insn = LookupSwitchInsn::new(*pc_label_map.get(&default).ok_or_else(ParserError::unmapped_label)?);
 					
 					for i in 0..npairs {
 						let matc = rdr.read_i32::<BigEndian>()?;
 						let jump = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
-						insn.cases.insert(matc, LabelInsn::new(jump));
+						insn.cases.insert(matc, *pc_label_map.get(&jump).ok_or_else(ParserError::unmapped_label)?);
 					}
 					
 					pc += pad + (2 * 4) + (npairs * 2 * 4);
-					required_labels += npairs + 1;
 					
 					Insn::LookupSwitch(insn)
 				}
@@ -791,9 +991,8 @@ impl InsnParser {
 				InsnParser::MONITOREXIT => Insn::MonitorExit(MonitorExitInsn::new()),
 				InsnParser::MULTIANEWARRAY => {
 					let kind = constant_pool.utf8(constant_pool.class(rdr.read_u16::<BigEndian>()?)?.name_index)?.str.clone();
-					pc += 2;
 					let dimensions = rdr.read_u8()?;
-					pc += 1;
+					pc += 3;
 					Insn::MultiNewArray(MultiNewArrayInsn::new(kind, dimensions))
 				},
 				InsnParser::NEW => {
@@ -852,7 +1051,7 @@ impl InsnParser {
 					let pad = 3 - (this_pc % 4);
 					rdr.read_nbytes(pad as usize)?;
 					
-					let default = LabelInsn::new((rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32);
+					let default = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
 					
 					let low = rdr.read_i32::<BigEndian>()?;
 					let high = rdr.read_i32::<BigEndian>()?;
@@ -860,14 +1059,13 @@ impl InsnParser {
 					let mut cases: Vec<LabelInsn> = Vec::with_capacity(num_cases as usize);
 					for i in 0..num_cases {
 						let case = (rdr.read_i32::<BigEndian>()? + this_pc as i32) as u32;
-						cases.push(LabelInsn::new(case));
+						cases.push(*pc_label_map.get(&case).ok_or_else(ParserError::unmapped_label)?);
 					}
 					
 					pc += pad + ((3 + num_cases) * 4);
-					required_labels += num_cases + 1;
 					
 					Insn::TableSwitch(TableSwitchInsn {
-						default,
+						default: *pc_label_map.get(&default).ok_or_else(ParserError::unmapped_label)?,
 						low,
 						cases
 					})
@@ -933,63 +1131,24 @@ impl InsnParser {
 				}
 				_ => return Err(ParserError::unknown_insn(opcode))
 			};
-			//println!("{:#?}", insn);
 			insns.push(insn);
-			pc_index_map.insert(this_pc, index);
 			
 			index += 1;
 		}
 		
-		let mut list = InsnList {
-			insns: Vec::with_capacity(0),
-			labels: 0
+		let list = InsnList {
+			insns,
+			labels: pc_label_map.len() as u32
 		};
-		
-		if required_labels > 0 {
-			let mut insert: HashMap<usize, Vec<Insn>> = HashMap::with_capacity(required_labels as usize);
-			// Remap labels to indexes
-			for insn in insns.iter_mut() {
-				match insn {
-					Insn::Jump(x) => InsnParser::remap_label_nodes(&mut x.jump_to, &mut list, &pc_index_map, &mut insert)?,
-					Insn::ConditionalJump(x) => InsnParser::remap_label_nodes(&mut x.jump_to, &mut list, &pc_index_map, &mut insert)?,
-					Insn::TableSwitch(x) => {
-						InsnParser::remap_label_nodes(&mut x.default, &mut list, &pc_index_map, &mut insert)?;
-						for case in x.cases.iter_mut() {
-							InsnParser::remap_label_nodes(case, &mut list, &pc_index_map, &mut insert)?
-						}
-					}
-					Insn::LookupSwitch(x) => {
-						InsnParser::remap_label_nodes(&mut x.default, &mut list, &pc_index_map, &mut insert)?;
-						for (case, jump) in x.cases.iter_mut() {
-							InsnParser::remap_label_nodes(jump, &mut list, &pc_index_map, &mut insert)?
-						}
-					}
-					_ => {}
-				}
-			}
-			insns.reserve_exact(insert.len());
-			for (index, mut insert) in insert.drain() {
-				for insn in insert.drain(..) {
-					if index <= insns.len() {
-						insns.insert(index, insn);
-					} else {
-						insns.push(insn);
-					}
-				}
-			}
-		}
-		list.insns = insns;
 		
 		Ok(list)
 	}
 	
 	fn remap_label_nodes(x: &mut LabelInsn, list: &mut InsnList, pc_index_map: &HashMap<u32, u32>, insert: &mut HashMap<usize, Vec<Insn>>) -> Result<()> {
-		let jump_to = list.new_label();
 		let mut insert_into = *match pc_index_map.get(&x.id) {
 			Some(x) => x,
 			_ => return Err(ParserError::out_of_bounds_jump(x.id as i32))
 		};
-		x.id = jump_to.id;
 		
 		for (i, insns) in insert.iter() {
 			for _ in 0..insns.len() {
@@ -998,6 +1157,10 @@ impl InsnParser {
 				}
 			}
 		}
+		
+		let jump_to = list.new_label();
+		x.id = jump_to.id;
+		
 		insert.entry(insert_into as usize)
 			.or_insert(Vec::with_capacity(1))
 			.push(Insn::Label(jump_to));

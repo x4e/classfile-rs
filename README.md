@@ -8,7 +8,9 @@ Goals:
 * Stackmap frame generation
 * Resistant to malicious/malformed class files
 
-The AST is designed to be more logical and intuitive than the official bytecode specification. 
+The AST is designed to be more logical and intuitive to a Java developer than the official bytecode
+ specification. 
+
 For example, `iconst_0`s are represented as `ldc(0)`s, `invokestatic(...)`s are represented as `invoke(static, ...)`.
 Bytecode offsets are also transformed into labels.
 The constant pool is fully abstracted.
@@ -23,7 +25,7 @@ The library should take <1ms to read an averagely sized class file, but can take
  control flow within the class (Label reading is not optimal at the moment).
 
 Here is a benchmark:
-![Throughput benchmark](https://i.imgur.com/7JhSLAg.png)
+![Throughput benchmark](https://cdn.discordapp.com/attachments/665688984302649354/803225667399057448/unknown.png)
 
 ## Examples
 [Reading a class file](https://github.com/x4e/classfile-rs/tree/master/examples/read/src/main.rs)

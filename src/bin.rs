@@ -1,6 +1,6 @@
 use std::time::Instant;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Cursor};
 use std::env;
 
 use classfile::classfile::ClassFile;

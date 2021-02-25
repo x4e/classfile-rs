@@ -47,7 +47,7 @@ impl ClassFile {
 		
 		let fields = Fields::parse(rdr, &version, &constant_pool)?;
 		let methods = Methods::parse(rdr, &version, &constant_pool)?;
-		let attributes = Attributes::parse(rdr, AttributeSource::Class, &version, &constant_pool)?;
+		let attributes = Attributes::parse(rdr, AttributeSource::Class, &version, &constant_pool, &mut None)?;
 		
 		Ok(ClassFile {
 			magic,
@@ -94,7 +94,7 @@ impl ClassFile {
 		
 		Fields::write(&mut cursor, &self.fields, &mut constant_pool)?;
 		Methods::write(&mut cursor, &self.methods, &mut constant_pool)?;
-		Attributes::write(&mut cursor, &self.attributes, &mut constant_pool)?;
+		Attributes::write(&mut cursor, &self.attributes, &mut constant_pool, None)?;
 		
 		constant_pool.write(wtr)?;
 		wtr.write_all(cursor.get_ref().as_slice())?;

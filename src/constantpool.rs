@@ -188,6 +188,11 @@ impl ConstantPool {
 		}
 	}
 	
+	pub fn utf8_inner(&self, index: CPIndex) -> Result<String> {
+		let utf8_info = self.utf8(index)?;
+		Ok(utf8_info.str.clone())
+	}
+	
 	pub fn methodhandle(&self, index: CPIndex) -> Result<&MethodHandleInfo> {
 		match self.get(index)? {
 			ConstantType::MethodHandle(t) => Ok(t),

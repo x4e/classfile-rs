@@ -46,16 +46,18 @@ impl CodeAttribute {
 		let mut pc_label_map: HashMap<u32, LabelInsn> = HashMap::new();
 		InsnParser::find_insn_refs(&mut code, code_length, &mut pc_label_map)?;
 		
-		code.set_position(0);
-		let code = InsnParser::parse_insns(constant_pool, &mut code, code_length, &mut pc_label_map)?;
-		
 		let num_exceptions = buf.read_u16::<BigEndian>()?;
 		let mut exceptions: Vec<ExceptionHandler> = Vec::with_capacity(num_exceptions as usize);
 		for _ in 0..num_exceptions {
 			exceptions.push(ExceptionHandler::parse(constant_pool, &mut buf)?);
 		}
 		
-		let attributes = Attributes::parse(&mut buf, AttributeSource::Code, version, constant_pool)?;
+		let mut pc_label_map = Some(pc_label_map);
+		let attributes = Attributes::parse(&mut buf, AttributeSource::Code, version, constant_pool, &mut pc_label_map)?;
+		let mut pc_label_map = pc_label_map.unwrap();
+		
+		code.set_position(0);
+		let code = InsnParser::parse_insns(constant_pool, &mut code, code_length, &mut pc_label_map)?;
 		
 		Ok(CodeAttribute {
 			max_stack,
@@ -69,14 +71,14 @@ impl CodeAttribute {
 	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
 		wtr.write_u16::<BigEndian>(self.max_stack)?;
 		wtr.write_u16::<BigEndian>(self.max_locals)?;
-		let code_bytes = InsnParser::write_insns(self, constant_pool)?;
+		let (code_bytes, label_pc_map) = InsnParser::write_insns(self, constant_pool)?;
 		wtr.write_u32::<BigEndian>(code_bytes.len() as u32)?;
 		wtr.write_all(code_bytes.as_slice())?;
 		wtr.write_u16::<BigEndian>(self.exceptions.len() as u16)?;
 		for excep in self.exceptions.iter() {
 			excep.write(wtr, constant_pool)?;
 		}
-		Attributes::write(wtr, &self.attributes, constant_pool)?;
+		Attributes::write(wtr, &self.attributes, constant_pool, Some(&label_pc_map))?;
 		Ok(())
 	}
 }
@@ -533,7 +535,9 @@ impl InsnParser {
 					rdr.seek(SeekFrom::Current(4))?;
 				}
 				InsnParser::WIDE => match rdr.read_u8()? {
-					InsnParser::ILOAD | InsnParser::FLOAD | InsnParser::ALOAD | InsnParser::LLOAD | InsnParser::DLOAD | InsnParser::ISTORE | InsnParser::FSTORE | InsnParser::LSTORE | InsnParser::DSTORE => {
+					InsnParser::ILOAD | InsnParser::FLOAD | InsnParser::ALOAD | InsnParser::LLOAD |
+					InsnParser::DLOAD | InsnParser::ISTORE | InsnParser::FSTORE |
+					InsnParser::LSTORE | InsnParser::DSTORE => {
 						pc += 3;
 						rdr.seek(SeekFrom::Current(3))?;
 					}
@@ -554,7 +558,6 @@ impl InsnParser {
 		let mut insns: Vec<Insn> = Vec::with_capacity(num_insns_estimate);
 		
 		let mut pc: u32 = 0;
-		let mut index: u32 = 0;
 		while pc < length {
 			let this_pc = pc;
 			let opcode = rdr.read_u8()?;
@@ -1132,8 +1135,11 @@ impl InsnParser {
 				_ => return Err(ParserError::unknown_insn(opcode))
 			};
 			insns.push(insn);
-			
-			index += 1;
+		}
+		
+		// there can be a label at the end of the code space, e.g. for an end exception handler
+		if let Some(lbl) = pc_label_map.get(&pc) {
+			insns.push(Insn::Label(*lbl));
 		}
 		
 		let list = InsnList {
@@ -1188,7 +1194,7 @@ impl InsnParser {
 		Ok(Insn::Ldc(LdcInsn::new(ldc_type)))
 	}
 	
-	fn write_insns(code: &CodeAttribute, constant_pool: &mut ConstantPoolWriter) -> Result<Vec<u8>> {
+	fn write_insns(code: &CodeAttribute, constant_pool: &mut ConstantPoolWriter) -> Result<(Vec<u8>, HashMap<LabelInsn, u32>)> {
 		let mut wtr: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(code.insns.len()));
 		
 		let mut label_pc_map: HashMap<LabelInsn, u32> = HashMap::new();
@@ -1901,7 +1907,7 @@ impl InsnParser {
 			}
 		}
 		
-		Ok(wtr.into_inner())
+		Ok((wtr.into_inner(), label_pc_map))
 	}
 	
 	fn write_ldc<T: Write>(wtr: &mut T, constant: u16, double_size: bool) -> Result<u32> {

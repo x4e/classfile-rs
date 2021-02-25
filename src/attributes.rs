@@ -1,10 +1,13 @@
 use crate::constantpool::{ConstantPool, ConstantType, ConstantPoolWriter};
 use crate::version::{MajorVersion, ClassVersion};
 use crate::code::CodeAttribute;
-use crate::error::Result;
+use crate::error::{Result, ParserError};
 use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
-use std::io::{Write, Read};
+use std::io::{Write, Read, Cursor};
 use derive_more::Constructor;
+use crate::ast::LabelInsn;
+use crate::utils::{ReadUtils, MapUtils};
+use std::collections::HashMap;
 
 #[allow(non_snake_case)]
 pub mod Attributes {
@@ -13,20 +16,22 @@ pub mod Attributes {
 	use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 	use crate::version::{ClassVersion};
 	use crate::attributes::{Attribute, AttributeSource};
+	use std::collections::HashMap;
+	use crate::ast::LabelInsn;
 	
-	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> crate::Result<Vec<Attribute>> {
+	pub fn parse<R: Read>(rdr: &mut R, source: AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool, pc_label_map: &mut Option<HashMap<u32, LabelInsn>>) -> crate::Result<Vec<Attribute>> {
 		let num_attributes = rdr.read_u16::<BigEndian>()? as usize;
 		let mut attributes: Vec<Attribute> = Vec::with_capacity(num_attributes);
 		for _ in 0..num_attributes {
-			attributes.push(Attribute::parse(rdr, &source, version, constant_pool)?);
+			attributes.push(Attribute::parse(rdr, &source, version, constant_pool, pc_label_map.as_mut())?);
 		}
 		Ok(attributes)
 	}
 	
-	pub fn write<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
+	pub fn write<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &mut ConstantPoolWriter, label_pc_map: Option<&HashMap<LabelInsn, u32>>) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
-			attribute.write(wtr, constant_pool)?;
+			attribute.write(wtr, constant_pool, &label_pc_map)?;
 		}
 		Ok(())
 	}
@@ -180,21 +185,91 @@ impl SourceFileAttribute {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct LocalVariableTableAttribute {
+	pub variables: Vec<LocalVariable>
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LocalVariable {
+	pub start: LabelInsn,
+	pub end: LabelInsn,
+	pub name: String,
+	pub descriptor: String,
+	pub index: u16
+}
+
+impl LocalVariableTableAttribute {
+	pub fn parse(constant_pool: &ConstantPool, buf: Vec<u8>, pc_label_map: &mut HashMap<u32, LabelInsn>) -> Result<Self> {
+		let mut buf = Cursor::new(buf);
+		let num_vars = buf.read_u16::<BigEndian>()? as usize;
+		let mut variables: Vec<LocalVariable> = Vec::with_capacity(num_vars);
+		for _ in 0..num_vars {
+			variables.push(LocalVariable::parse(constant_pool, &mut buf, pc_label_map)?)
+		}
+		Ok(LocalVariableTableAttribute {
+			variables
+		})
+	}
+	
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter, label_pc_map: &HashMap<LabelInsn, u32>) -> Result<()> {
+		wtr.write_u16::<BigEndian>(self.variables.len() as u16)?;
+		for var in self.variables.iter() {
+			var.write(wtr, constant_pool, label_pc_map)?;
+		}
+		Ok(())
+	}
+}
+
+impl LocalVariable {
+	pub fn parse(constant_pool: &ConstantPool, buf: &mut Cursor<Vec<u8>>, pc_label_map: &mut HashMap<u32, LabelInsn>) -> Result<Self> {
+		let start_pc = buf.read_u16::<BigEndian>()? as u32;
+		let end_pc = start_pc + (buf.read_u16::<BigEndian>()? as u32);
+		pc_label_map.insert_if_not_present(start_pc, LabelInsn::new(pc_label_map.len() as u32));
+		pc_label_map.insert_if_not_present(end_pc, LabelInsn::new(pc_label_map.len() as u32));
+		
+		let name = constant_pool.utf8_inner(buf.read_u16::<BigEndian>()?)?;
+		let descriptor = constant_pool.utf8_inner(buf.read_u16::<BigEndian>()?)?;
+		let index = buf.read_u16::<BigEndian>()?;
+		
+		Ok(LocalVariable {
+			start: *pc_label_map.get(&start_pc).ok_or_else(ParserError::unmapped_label)?,
+			end: *pc_label_map.get(&end_pc).ok_or_else(ParserError::unmapped_label)?,
+			name,
+			descriptor,
+			index
+		})
+	}
+	
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter, label_pc_map: &HashMap<LabelInsn, u32>) -> Result<()> {
+		let start_pc = *label_pc_map.get(&self.start).ok_or_else(ParserError::unmapped_label)?;
+		wtr.write_u16::<BigEndian>(start_pc as u16)?;
+		let end_pc = *label_pc_map.get(&self.end).ok_or_else(ParserError::unmapped_label)?;
+		wtr.write_u16::<BigEndian>((end_pc - start_pc) as u16)?;
+		ZIL
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
+		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
+		
+		wtr.write_u16::<BigEndian>(self.index)?;
+		Ok(())
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Attribute {
 	ConstantValue(ConstantValueAttribute),
 	Signature(SignatureAttribute),
 	Code(CodeAttribute),
 	Exceptions(ExceptionsAttribute),
 	SourceFile(SourceFileAttribute),
+	LocalVariableTable(LocalVariableTableAttribute),
 	Unknown(UnknownAttribute)
 }
 
 impl Attribute {
-	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool) -> Result<Attribute> {
+	pub fn parse<R: Read>(rdr: &mut R, source: &AttributeSource, version: &ClassVersion, constant_pool: &ConstantPool, pc_label_map: Option<&mut HashMap<u32, LabelInsn>>) -> Result<Attribute> {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let attribute_length = rdr.read_u32::<BigEndian>()? as usize;
-		let mut buf: Vec<u8> = Vec::with_capacity(attribute_length);
-		rdr.take(attribute_length as u64).read_to_end(&mut buf)?;
+		let buf: Vec<u8> = rdr.read_nbytes(attribute_length as usize)?;
 		let str = name.as_str();
 		
 		let attr = match source {
@@ -226,13 +301,20 @@ impl Attribute {
 				}
 			}
 			AttributeSource::Code => {
-				Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
+				let pc_label_map = pc_label_map.unwrap();
+				if str == "LocalVariableTable" {
+					Attribute::LocalVariableTable(LocalVariableTableAttribute::parse(constant_pool, buf, pc_label_map)?)
+				//} else if str == "LocalVariableTypeTable" && version.major >= MajorVersion::JAVA_5 {
+				
+				} else {
+					Attribute::Unknown(UnknownAttribute::parse(name, buf)?)
+				}
 			}
 		};
 		Ok(attr)
 	}
 	
-	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter) -> Result<()> {
+	pub fn write<T: Write>(&self, wtr: &mut T, constant_pool: &mut ConstantPoolWriter, label_pc_map: &Option<&HashMap<LabelInsn, u32>>) -> Result<()> {
 		match self {
 			Attribute::ConstantValue(t) => {
 				let mut buf: Vec<u8> = Vec::new();
@@ -266,6 +348,14 @@ impl Attribute {
 				let mut buf: Vec<u8> = Vec::new();
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("SourceFile"))?;
 				t.write(&mut buf, constant_pool)?;
+				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
+				wtr.write(buf.as_slice())?;
+			},
+			Attribute::LocalVariableTable(t) => {
+				let label_pc_map = label_pc_map.unwrap();
+				let mut buf: Vec<u8> = Vec::new();
+				wtr.write_u16::<BigEndian>(constant_pool.utf8("LocalVariableTable"))?;
+				t.write(&mut buf, constant_pool, label_pc_map)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
 				wtr.write(buf.as_slice())?;
 			},

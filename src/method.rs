@@ -49,7 +49,7 @@ impl Method {
 		let name = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		let descriptor = constant_pool.utf8(rdr.read_u16::<BigEndian>()?)?.str.clone();
 		
-		let attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool)?;
+		let attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool, &mut None)?;
 		
 		let meth = Method {
 			access_flags,
@@ -139,7 +139,7 @@ impl Method {
 		self.access_flags.write(wtr)?;
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
-		Attributes::write(wtr, &self.attributes, constant_pool)?;
+		Attributes::write(wtr, &self.attributes, constant_pool, None)?;
 		Ok(())
 	}
 }

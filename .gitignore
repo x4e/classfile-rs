@@ -1,6 +1,7 @@
 .idea/
 /target
 /classes/benchmarking
+/classes/benchmarking_
 *.class
 Cargo.lock
 TestOut.class

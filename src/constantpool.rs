@@ -30,12 +30,18 @@ impl Debug for ConstantPool {
 	}
 }
 
-#[allow(dead_code)]
-impl ConstantPool {
-	pub fn new() -> ConstantPool {
+impl Default for ConstantPool {
+	fn default() -> Self {
 		ConstantPool {
 			inner: Vec::with_capacity(12)
 		}
+	}
+}
+
+#[allow(dead_code)]
+impl ConstantPool {
+	pub fn new() -> Self {
+		ConstantPool::default()
 	}
 	
 	pub fn get(&self, index: CPIndex) -> Result<&ConstantType> {
@@ -679,10 +685,7 @@ impl ConstantType {
 	}
 	
 	pub fn double_size(&self) -> bool {
-		match self {
-			ConstantType::Double(..) | ConstantType::Long(..) => true,
-			_ => false
-		}
+		matches!(self, ConstantType::Double(..) | ConstantType::Long(..))
 	}
 }
 
@@ -691,12 +694,18 @@ pub struct ConstantPoolWriter {
 	index: CPIndex
 }
 
-impl ConstantPoolWriter {
-	pub fn new() -> ConstantPoolWriter {
+impl Default for ConstantPoolWriter {
+	fn default() -> Self {
 		ConstantPoolWriter {
 			inner: LinkedHashMap::with_capacity(5),
 			index: 1
-		}
+		}	
+	}
+}
+
+impl ConstantPoolWriter {
+	pub fn new() -> Self {
+		ConstantPoolWriter::default()
 	}
 	
 	pub fn put(&mut self, constant: ConstantType) -> CPIndex {
@@ -713,6 +722,10 @@ impl ConstantPoolWriter {
 	
 	pub fn len(&self) -> u16 {
 		self.index
+	}
+	
+	pub fn is_empty(&self) -> bool {
+		self.index == 0
 	}
 	
 	pub fn class(&mut self, name_index: CPIndex) -> CPIndex {

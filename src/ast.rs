@@ -398,7 +398,7 @@ impl TableSwitchInsn {
 	#[allow(dead_code)]
 	pub fn get(&self, case: i32) -> Option<LabelInsn> {
 		if let Some(x) = self.cases.get((case - self.low) as usize) {
-			Some(x.clone())
+			Some(*x)
 		} else {
 			None
 		}
@@ -414,10 +414,8 @@ impl Debug for TableSwitchInsn {
 			fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 				let mut map = f.debug_map();
 				map.entry(&"default", &self.tbl.default);
-				let mut index = 0;
-				for case in self.tbl.cases.iter() {
-					map.entry(&(index + self.tbl.low), case);
-					index += 1;
+				for (index, case) in self.tbl.cases.iter().enumerate() {
+					map.entry(&(index as i32 + self.tbl.low), case);
 				}
 				map.finish()
 			}

@@ -1168,7 +1168,7 @@ impl InsnParser {
 		x.id = jump_to.id;
 		
 		insert.entry(insert_into as usize)
-			.or_insert(Vec::with_capacity(1))
+			.or_insert_with(|| Vec::with_capacity(1))
 			.push(Insn::Label(jump_to));
 		Ok(())
 	}
@@ -1228,7 +1228,7 @@ impl InsnParser {
 		for insn in code.insns.iter() {
 			match insn {
 				Insn::Label(x) => {
-					label_pc_map.insert(x.clone(), pc);
+					label_pc_map.insert(*x, pc);
 					if let Some(refs) = forward_references.get(x) {
 						let vec_mut = wtr.get_mut();
 						for ref_t in refs.iter() {
@@ -1274,7 +1274,7 @@ impl InsnParser {
 									let i = *at as usize;
 									let offset: i32 = pc as i32 - i as i32;
 									let off_bytes = offset.to_be_bytes();
-									vec_mut[i + 0] = off_bytes[0];
+									vec_mut[i]     = off_bytes[0];
 									vec_mut[i + 1] = off_bytes[1];
 									vec_mut[i + 2] = off_bytes[2];
 									vec_mut[i + 3] = off_bytes[3];
@@ -1722,9 +1722,8 @@ impl InsnParser {
 						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
 							vec.push(ReferenceType::Jump(pc));
 						} else {
-							let mut vec = Vec::new();
-							vec.push(ReferenceType::Jump(pc));
-							forward_references.insert(x.jump_to.clone(), vec);
+							let vec = vec![ReferenceType::Jump(pc)];
+							forward_references.insert(x.jump_to, vec);
 						}
 						wtr.write_u8(InsnParser::GOTO)?;
 						wtr.write_u16::<BigEndian>(0)?;
@@ -1772,9 +1771,8 @@ impl InsnParser {
 						if let Some(vec) = forward_references.get_mut(&x.jump_to) {
 							vec.push(ReferenceType::Conditional(pc));
 						} else {
-							let mut vec = Vec::new();
-							vec.push(ReferenceType::Conditional(pc));
-							forward_references.insert(x.jump_to.clone(), vec);
+							let vec = vec![ReferenceType::Conditional(pc)];
+							forward_references.insert(x.jump_to, vec);
 						}
 						wtr.write_u8(opcode)?;
 						wtr.write_u16::<BigEndian>(0)?;
@@ -1859,9 +1857,8 @@ impl InsnParser {
 						if let Some(vec) = forward_references.get_mut(&x.default) {
 							vec.push(ReferenceType::Direct(pc + 2));
 						} else {
-							let mut vec = Vec::new();
-							vec.push(ReferenceType::Direct(pc + 2));
-							forward_references.insert(x.default.clone(), vec);
+							let vec = vec![ReferenceType::Direct(pc + 2)];
+							forward_references.insert(x.default, vec);
 						}
 						wtr.write_i32::<BigEndian>(0)?;
 					}
@@ -1879,9 +1876,8 @@ impl InsnParser {
 							if let Some(vec) = forward_references.get_mut(to) {
 								vec.push(ReferenceType::Direct(pc + 4));
 							} else {
-								let mut vec = Vec::new();
-								vec.push(ReferenceType::Direct(pc + 4));
-								forward_references.insert(to.clone(), vec);
+								let vec = vec![ReferenceType::Direct(pc + 4)];
+								forward_references.insert(*to, vec);
 							}
 							wtr.write_i32::<BigEndian>(0)?;
 						}

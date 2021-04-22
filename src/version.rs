@@ -5,20 +5,27 @@ use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
 use crate::error::{Result, ParserError};
 use std::convert::{TryFrom, TryInto};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ClassVersion {
 	pub major: MajorVersion,
 	pub minor: u16
 }
 
-impl PartialOrd for ClassVersion {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+impl Ord for ClassVersion {
+	fn cmp(&self, other: &Self) -> Ordering {
 		let major = self.major.cmp(&other.major);
 		if major == Ordering::Equal {
-			return Some(self.minor.cmp(&other.minor));
+			self.minor.cmp(&other.minor)
+		} else {
+			major
 		}
-		Some(major)
 	}
+}
+
+impl PartialOrd for ClassVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Serializable for ClassVersion {

@@ -42,17 +42,17 @@ impl Type {
 	}
 }
 
-pub fn parse_method_desc(desc: &String) -> Result<(Vec<Type>, Type)> {
+pub fn parse_method_desc(desc: &str) -> Result<(Vec<Type>, Type)> {
 	parse_method_desc_chars(&desc.as_bytes())
 }
 
 fn parse_method_desc_chars(desc: &[u8]) -> Result<(Vec<Type>, Type)> {
-	if desc[0] != '(' as u8 {
+	if desc[0] != b'(' {
 		return Err(ParserError::invalid_descriptor("Method desc must start with '('"));
 	}
 	let mut args: Vec<Type> = Vec::new();
 	let mut i = 1usize;
-	while desc[i] != ')' as u8 {
+	while desc[i] != b')' {
 		let (typ, i2) = parse_type_chars(desc, i)?;
 		args.push(typ);
 		i = i2;
@@ -65,7 +65,7 @@ fn parse_method_desc_chars(desc: &[u8]) -> Result<(Vec<Type>, Type)> {
 	Ok((args, ret))
 }
 
-pub fn parse_type(desc: &String) -> Result<(Type, usize)> {
+pub fn parse_type(desc: &str) -> Result<(Type, usize)> {
 	parse_type_chars(&desc.as_bytes(), 0)
 }
 
@@ -85,7 +85,7 @@ fn parse_type_chars(desc: &[u8], mut index: usize) -> Result<(Type, usize)> {
 		BOOLEAN => (Type::Boolean, index + 1),
 		'L' => {
 			let mut buf = String::new();
-			while desc[index] != ';' as u8 {
+			while desc[index] != b';' {
 				index += 1;
 				if index >= desc.len() {
 					return Err(ParserError::invalid_descriptor("Type missing ';'"))

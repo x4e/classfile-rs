@@ -26,7 +26,7 @@ pub mod Methods {
 		Ok(fields)
 	}
 	
-	pub fn write<T: Write>(wtr: &mut T, fields: &Vec<Method>, constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
+	pub fn write<T: Write>(wtr: &mut T, fields: &[Method], constant_pool: &mut ConstantPoolWriter) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(fields.len() as u16)?;
 		for field in fields.iter() {
 			field.write(wtr, constant_pool)?;
@@ -51,13 +51,12 @@ impl Method {
 		
 		let attributes = Attributes::parse(rdr, AttributeSource::Method, version, constant_pool, &mut None)?;
 		
-		let meth = Method {
+		Ok(Method {
 			access_flags,
 			name,
 			descriptor,
 			attributes
-		};
-		Ok(meth)
+		})
 	}
 	
 	pub fn signature(&mut self) -> Option<&mut String> {
@@ -66,15 +65,15 @@ impl Method {
 				return Some(&mut sig.signature)
 			}
 		}
-		return None
+		None
 	}
 	
 	pub fn set_signature(&mut self, sig: Option<String>) {
 		let index = self.attributes.find_first(|attr| {
-			if let Attribute::Signature(_) = attr { true } else { false }
+			matches!(attr, Attribute::Signature(_))
 		});
 		if let Some(sig) = sig {
-			let attr = Attribute::Signature(SignatureAttribute::new(sig.clone()));
+			let attr = Attribute::Signature(SignatureAttribute::new(sig));
 			if let Some(index) = index {
 				self.attributes.replace(index, attr);
 			} else {
@@ -91,15 +90,15 @@ impl Method {
 				return Some(&mut x.exceptions)
 			}
 		}
-		return None
+		None
 	}
 	
 	pub fn set_exceptions(&mut self, exc: Option<Vec<String>>) {
 		let index = self.attributes.find_first(|attr| {
-			if let Attribute::Exceptions(_) = attr { true } else { false }
+			matches!(attr, Attribute::Exceptions(_))
 		});
 		if let Some(exc) = exc {
-			let attr = Attribute::Exceptions(ExceptionsAttribute::new(exc.clone()));
+			let attr = Attribute::Exceptions(ExceptionsAttribute::new(exc));
 			if let Some(index) = index {
 				self.attributes.replace(index, attr);
 			} else {
@@ -116,12 +115,12 @@ impl Method {
 				return Some(x)
 			}
 		}
-		return None
+		None
 	}
 	
 	pub fn set_code(&mut self, code: Option<CodeAttribute>) {
 		let index = self.attributes.find_first(|attr| {
-			if let Attribute::Code(_) = attr { true } else { false }
+			matches!(attr, Attribute::Code(_))
 		});
 		if let Some(code) = code {
 			let attr = Attribute::Code(code);

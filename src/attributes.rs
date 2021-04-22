@@ -28,7 +28,7 @@ pub mod Attributes {
 		Ok(attributes)
 	}
 	
-	pub fn write<W: Write>(wtr: &mut W, attributes: &Vec<Attribute>, constant_pool: &mut ConstantPoolWriter, label_pc_map: Option<&HashMap<LabelInsn, u32>>) -> crate::Result<()> {
+	pub fn write<W: Write>(wtr: &mut W, attributes: &[Attribute], constant_pool: &mut ConstantPoolWriter, label_pc_map: Option<&HashMap<LabelInsn, u32>>) -> crate::Result<()> {
 		wtr.write_u16::<BigEndian>(attributes.len() as u16)?;
 		for attribute in attributes.iter() {
 			attribute.write(wtr, constant_pool, &label_pc_map)?;
@@ -162,6 +162,10 @@ impl UnknownAttribute {
 	pub fn len(&self) -> usize {
 		self.buf.len()
 	}
+	
+	pub fn is_empty(&self) -> bool {
+		self.buf.is_empty()
+	}
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -245,7 +249,6 @@ impl LocalVariable {
 		wtr.write_u16::<BigEndian>(start_pc as u16)?;
 		let end_pc = *label_pc_map.get(&self.end).ok_or_else(ParserError::unmapped_label)?;
 		wtr.write_u16::<BigEndian>((end_pc - start_pc) as u16)?;
-		ZIL
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.name.clone()))?;
 		wtr.write_u16::<BigEndian>(constant_pool.utf8(self.descriptor.clone()))?;
 		
@@ -321,35 +324,35 @@ impl Attribute {
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("ConstantValue"))?;
 				t.write(&mut buf, constant_pool)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::Signature(t) => {
 				let mut buf: Vec<u8> = Vec::new();
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("Signature"))?;
 				t.write(&mut buf, constant_pool)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::Code(t) => {
 				let mut buf: Vec<u8> = Vec::new();
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("Code"))?;
 				t.write(&mut buf, constant_pool)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::Exceptions(t) => {
 				let mut buf: Vec<u8> = Vec::new();
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("Exceptions"))?;
 				t.write(&mut buf, constant_pool)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::SourceFile(t) => {
 				let mut buf: Vec<u8> = Vec::new();
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("SourceFile"))?;
 				t.write(&mut buf, constant_pool)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::LocalVariableTable(t) => {
 				let label_pc_map = label_pc_map.unwrap();
@@ -357,7 +360,7 @@ impl Attribute {
 				wtr.write_u16::<BigEndian>(constant_pool.utf8("LocalVariableTable"))?;
 				t.write(&mut buf, constant_pool, label_pc_map)?;
 				wtr.write_u32::<BigEndian>(buf.len() as u32)?;
-				wtr.write(buf.as_slice())?;
+				wtr.write_all(buf.as_slice())?;
 			},
 			Attribute::Unknown(t) => {
 				wtr.write_u16::<BigEndian>(constant_pool.utf8(t.name.clone()))?;

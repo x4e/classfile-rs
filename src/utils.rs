@@ -23,12 +23,10 @@ impl <T> VecUtils<T> for Vec<T> {
 	
 	fn find_first<F>(&self, mut op: F) -> Option<usize> where
 		F: FnMut(&T) -> bool {
-		let mut i = 0usize;
-		for attr in self.iter() {
+		for (i, attr) in self.iter().enumerate() {
 			if op(attr) {
 				return Some(i);
 			}
-			i += 1;
 		}
 		None
 	}

@@ -8,13 +8,19 @@ pub struct InsnList {
 	pub(crate) labels: u32
 }
 
-#[allow(dead_code)]
-impl InsnList {
-	pub fn new() -> Self {
+impl Default for InsnList {
+	fn default() -> Self {
 		InsnList {
 			insns: Vec::new(),
 			labels: 0
 		}
+	}
+}
+
+#[allow(dead_code)]
+impl InsnList {
+	pub fn new() -> Self {
+		InsnList::default()
 	}
 	
 	pub fn with_capacity(capacity: usize) -> Self {
@@ -37,6 +43,10 @@ impl InsnList {
 	
 	pub fn len(&self) -> usize {
 		self.insns.len()
+	}
+	
+	pub fn is_empty(&self) -> bool {
+		self.insns.is_empty()
 	}
 }
 
